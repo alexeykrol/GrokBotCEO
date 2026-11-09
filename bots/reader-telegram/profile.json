@@ -1,0 +1,9 @@
+{
+  "name": "Reader Telegram",
+  "title": "",
+  "avatarShape": "",
+  "avatarColor": "",
+  "namedBy": "user",
+  "harness": "temporal",
+  "_comment": "Remove 'serverId' before creating bot. Configure Telegram channel subscriptions in bot settings. Persona lives only in prompt.md (do not add a description field here)."
+}

@@ -1,0 +1,9 @@
+{
+  "name": "Task Manager",
+  "title": "",
+  "avatarShape": "",
+  "avatarColor": "",
+  "namedBy": "user",
+  "harness": "temporal",
+  "_comment": "Remove 'serverId' before creating bot. Configure file system access and git settings. Persona lives only in prompt.md (do not add a description field here)."
+}

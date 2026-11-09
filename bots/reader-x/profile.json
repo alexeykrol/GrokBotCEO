@@ -1,0 +1,9 @@
+{
+  "name": "Reader X",
+  "title": "",
+  "avatarShape": "",
+  "avatarColor": "",
+  "namedBy": "user",
+  "harness": "temporal",
+  "_comment": "Remove 'serverId' before creating bot - use your actual server ID. Configure X account connection in bot settings. Persona lives only in prompt.md (do not add a description field here)."
+}

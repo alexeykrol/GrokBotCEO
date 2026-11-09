@@ -1,0 +1,9 @@
+{
+  "name": "Main Grok",
+  "title": "",
+  "avatarShape": "blob",
+  "avatarColor": "green",
+  "namedBy": "user",
+  "harness": "temporal",
+  "_comment": "Remove 'serverId' before creating bot - use your actual server ID. Persona lives only in prompt.md (do not add a description field here)."
+}

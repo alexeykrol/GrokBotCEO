@@ -1,0 +1,82 @@
+# handoff — Work Transfer Protocol
+
+Rules for passing work between bots with full context.
+
+## When to Handoff
+
+Bot A hands off to Bot B when:
+- Task requires Bot B's specialized capabilities
+- Bot A completed its part, Bot B does next step
+- Bot A is blocked and Bot B can unblock
+- Owner redirects work to different bot
+
+## Required Elements
+
+Every handoff message must include:
+
+```
+HANDOFF from=<sending-bot> to=<receiving-bot> item=<link-or-id> why=<1-phrase-reason> done=<completion-criterion> deadline=<date-or-none> approval=<yes-or-no>
+```
+
+**Example:**
+```
+HANDOFF from=Reader-X to=Implementer item=https://x.com/user/status/123 why=agent-tool-post-for-analysis done=analysis-posted-to-improvements deadline=2026-11-10 approval=yes
+```
+
+### Field Definitions
+
+- **from:** Sending bot name
+- **to:** Receiving bot name
+- **item:** Link, file path, or identifier for work item
+- **why:** One-phrase reason for this bot (not another)
+- **done:** How receiving bot knows task is complete
+- **deadline:** Date in owner's timezone, or `—` if none
+- **approval:** `yes` if owner must approve result, `no` if autonomous
+
+## Handoff Flow
+
+1. **Sender** prepares handoff with all required elements
+2. **Sender** creates board entry: `{id, status: "inbox", owner: receiving-bot, handoff: "...", updated}`
+3. **Sender** sends message to receiving bot with HANDOFF line + context
+4. **Receiver** checks handoff completeness: if `done=` missing, asks one clarifying question
+5. **Receiver** claims work: updates board to `in_progress`
+6. **Receiver** completes work per `done` criterion
+7. **Receiver** updates board to `review` or `done` depending on `approval`
+
+## Context Requirements
+
+Beyond HANDOFF line, include:
+- Relevant links or file paths
+- Key decisions or constraints from previous steps
+- What receiving bot should NOT do (if not obvious)
+- Expected outcome format
+
+**Good example:**
+```
+HANDOFF from=Reader-X to=Implementer item=https://x.com/user/status/123 why=cursor-agent-post-with-novel-approach done=analysis-in-improvements-channel deadline=— approval=yes
+
+Post describes new agent testing framework "agentic-bench". 
+Article full text saved to /data/articles/123.md (opened successfully).
+Scored ★4 (practical tool, clear adoption path).
+Analyze: what it does, how we'd use it, implementation effort.
+Do NOT install or test yet - analysis only for now.
+```
+
+## Anti-Patterns
+
+**Bad:** "Can you look at this post?" — missing HANDOFF format, no done criterion  
+**Bad:** Handoff without board entry — receiving bot can't track status  
+**Bad:** Changing done criterion mid-task without new handoff line  
+
+## Received Task Without done=
+
+If you receive handoff without `done=` criterion, send ONE question back:
+```
+What's the done criterion? (How do I know this task is complete?)
+```
+
+Don't proceed without clear completion criterion.
+
+---
+
+**Customize:** Adjust required fields, add custom metadata, define your own format. Keep structured approach for bot parsing.
