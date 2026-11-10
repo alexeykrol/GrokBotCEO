@@ -29,6 +29,11 @@ build error (step 7), CreateAgent error (step 8). These are **not** stops: a wri
 cannot be done (mark it `NOT VERIFIED`), a failed channel (step 9), a failed extension of the main
 bot (step 10). Tell the user in one line and continue.
 
+**Questions to the user: exactly two in the whole install.** The "yes" to the plan (step 6) and
+the copy offer (step 13). Everything else you decide yourself: version, main bot, names, folders.
+If you cannot decide, take the safe default (skip that part; Bot Maker can do it later), say so in
+one line and continue. A question the user cannot answer at once is where they give up.
+
 **Never:** ask for secrets in chat; create a bot not in the approved plan; create a second main
 bot; create or turn on a routine; send a message on the user's behalf; write inside `grokbotceo/`
 (the release copy); send `config.json` anywhere other than the user's own computer (step 13); add
@@ -91,8 +96,8 @@ Report the result in one short list. Do not look for workarounds.
 
 ## 3. Find the main bot
 
-The user already has a main bot: the default Grok Bot they talk to, normally you. Find its
-`agent_id` before creating anything:
+The main bot is **you**: the bot the user asked to install GrokBotCEO. Find your own `agent_id`
+before creating anything:
 
 ```bash
 python3 <WORKSPACE_PATH>/grokbotceo/scripts/bot-mirror.py list
@@ -101,11 +106,12 @@ python3 <WORKSPACE_PATH>/grokbotceo/scripts/bot-mirror.py list
 It prints every bot on the bot computer as `{agent_id, name}`, read from
 `~/agent-data/agents/*/profile.json`.
 
-- **One bot:** that is the main bot.
-- **More than one:** list their names and ask one question: "Which of these is your main bot, the
-  one you talk to every day?" Use the bot the user names.
-- **None, or the command fails:** say in one line that the main bot could not be found; it will
-  not be extended (step 10 is skipped, Bot Maker can do it later). Continue.
+Folders of deleted bots can stay behind, so the list may show bots that no longer exist. Ignore
+every entry whose name is not your own.
+
+- **Exactly one entry has your name:** that is you, the main bot.
+- **None or several, or the command fails:** do not ask. Step 10 is skipped; in the plan say in
+  one line that Bot Maker will teach the main bot later. Continue.
 
 Remember its `agent_id` and name for steps 6 and 10.
 
@@ -128,8 +134,8 @@ Stage 1 uses only the keys marked **stage 1** in `grokbotceo/config.schema.md`:
 `IMPROVEMENTS_CHANNEL_ID` (**stage 1 (runtime)**) is added in step 9, after the channel exists.
 Bots read it from `config.json` when they need it; it is never built into their texts.
 
-Write the keys to `<WORKSPACE_PATH>/config.json` as a flat JSON object `{KEY: value}`. Tell the user
-in one sentence which folder you work in and let them correct it. Ask nothing else.
+Write the keys to `<WORKSPACE_PATH>/config.json` as a flat JSON object `{KEY: value}`. Do not show the user
+the folder or the file. Ask nothing.
 
 ## 6. Plan and approval
 
@@ -277,7 +283,7 @@ computer (Mac or Linux)? It is refreshed after every change. Reply yes or no." N
 stop.
 
 - **Yes:** follow `grokbotceo/LOCAL-COPY.md` ([LOCAL-COPY.md](LOCAL-COPY.md)): warn about the
-  permission question, find the home folder, agree on the folder, write
+  permission question, find the home folder, pick the folder, write
   `<WORKSPACE_PATH>/local-copy.json`, commit it:
 
   ```bash

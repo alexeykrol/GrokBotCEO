@@ -22,8 +22,10 @@ computer"):
 1. Tell the user about the permission question (next section).
 2. On the user's computer run `uname -s && echo "$HOME"`. `Darwin` is a Mac, `Linux` is Linux.
    Anything else, or no answer: not supported yet; stop here.
-3. Suggest `<home>/GrokBotCEO`, where `<home>` is the folder printed. Let the user change it.
-   The path must start with `/` and must not contain quotes, `$`, backticks, backslashes or line
+3. Use `<home>/GrokBotCEO`, where `<home>` is the folder printed. If it exists and is not an
+   earlier copy (no `.grokbotceo-copy` marker), use `<home>/GrokBotCEO-2` (then `-3`, ...). Do not
+   ask; tell the user the folder name once, after the copy is made. A different folder only if
+   the user asks for one. The path must start with `/` and must not contain quotes, `$`, backticks, backslashes or line
    breaks. It must be a new folder or an earlier copy, never a folder with the user's files.
 4. Write `local-copy.json`, then `git add local-copy.json` and commit; the message records the
    user's exact yes words, `(yes: "<exact words>")`, and ends with the line `Bot: <your bot name>`.

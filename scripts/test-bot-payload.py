@@ -1567,7 +1567,7 @@ class TestRc3Mechanics(unittest.TestCase):
         self.assertEqual(hits, [])
 
     def test_version(self):
-        self.assertEqual((ROOT_DIR / "VERSION").read_text(encoding="utf-8").strip(), "0.1.0-rc4")
+        self.assertEqual((ROOT_DIR / "VERSION").read_text(encoding="utf-8").strip(), "0.1.0-rc5")
 
 
 class TestPublicTreeHygiene(unittest.TestCase):
@@ -1932,6 +1932,55 @@ class TestLocalCopy(unittest.TestCase):
                 self.assertNotEqual(r.returncode, 0)
                 self.assertTrue(r.stdout.startswith("STOP:"), r.stdout)
         self.assertEqual(sorted(p.name for p in self.tmp.iterdir()), ["gitconfig", "ws"])
+
+class TestInstallAsksOnlyTwoQuestions(unittest.TestCase):
+    """The installer asks the user exactly two things: yes to the plan and the copy offer.
+
+    Anything the bot can decide itself (version, main bot, names, folders) must never become a
+    question: a beginner who cannot answer at once gives up (test runs rc3, rc4).
+    """
+
+    DOCS = ["LOADING-INSTRUCTIONS.md", "LOCAL-COPY.md", "ONBOARDING.md", "ONBOARDING.ru.md"]
+    FORBIDDEN = [
+        "which of these", "which is your main", "which one is your main", "ask which",
+        "asks which", "let the user change", "let them correct", "agree on the folder",
+        "correct it only", "ask the user which version", "какой из них главный", "поправьте её",
+    ]
+    ALLOWED_NEGATIONS = ["never ask the user which version"]
+
+    def _text(self, name):
+        return (ROOT_DIR / name).read_text(encoding="utf-8")
+
+    def test_no_avoidable_questions(self):
+        hits = []
+        for name in self.DOCS:
+            for no, line in enumerate(self._text(name).splitlines(), 1):
+                low = line.lower()
+                if any(neg in low for neg in self.ALLOWED_NEGATIONS):
+                    continue
+                for phrase in self.FORBIDDEN:
+                    if phrase in low:
+                        hits.append(f"{name}:{no}: {phrase}")
+        self.assertEqual(hits, [])
+
+    def test_exactly_two_question_points_in_steps_6_and_13(self):
+        step, found = None, []
+        for line in self._text("LOADING-INSTRUCTIONS.md").splitlines():
+            m = re.match(r"## (\d+)\.", line)
+            if m:
+                step = int(m.group(1))
+            if re.search(r"\bAsk( one question)?:", line):
+                found.append(step)
+        self.assertEqual(found, [6, 13])
+
+    def test_rule_is_stated(self):
+        self.assertIn("exactly two in the whole install", self._text("LOADING-INSTRUCTIONS.md"))
+
+    def test_main_bot_is_the_installer_itself(self):
+        text = self._text("LOADING-INSTRUCTIONS.md")
+        self.assertIn("The main bot is **you**", text)
+        self.assertIn("do not ask", text)
+
 
 class TestCLI(unittest.TestCase):
     def test_help_works(self):

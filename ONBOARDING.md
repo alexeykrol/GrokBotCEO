@@ -29,13 +29,13 @@ Rules:
 ## 2. Check one setting
 
 The bot fills in `config.json` itself: the path of your workspace and the names of Bot Maker and
-Mentor. It tells you the folder; correct it only if it is wrong. Nothing else is asked. The file stays on
+Mentor. It asks you only two things during the whole install: your yes to the plan, and whether you want a copy on your own computer. The file stays on
 your Grok Bot computer (and in the optional copy on your own computer): it is never sent anywhere
 else and updates never touch it.
 
 ## 3. Approve the plan
 
-If you have more than one bot, it first asks which one is your main bot. Then it shows the plan:
+It shows the plan:
 
 | What | What it does |
 |---|---|
