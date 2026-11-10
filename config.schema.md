@@ -7,25 +7,29 @@ fictional example values with your own, and pass it with `--config`. Only the ke
 accepted; any other key is rejected. Values must be non-empty strings without `{{` or `}}`.
 
 "Required" means: the build fails if the key is missing and you build at least one bot listed
-in "Used by". "Used by" is computed from the compiled sources (`bots/*/prompt.md` and the
-`name` in `bots/*/profile.json`).
+in "Used by". "Used by" is computed from the compiled sources (`bots/*/prompt.md`,
+`bots/*/block.md`, the shared blocks they include from `bots/_blocks/`, and the `name` in
+`bots/*/profile.json`).
 
-"Stage 1": this release installs only main-grok, bot-maker. Keys marked **stage 1**
-are used by these bots and are the only ones the installer writes to `config.json`. All other
-keys are used by optional bots that this release does not install; `config.example.json`
-keeps them so those bots still build.
+"Stage 1": this release creates only bot-maker, mentor and adds `bots/main-grok/block.md` to the user's own
+main bot. Keys marked **stage 1** are used by these texts and are the only ones the installer
+writes to `config.json`. **stage 1 (runtime)**: the installer writes the key later (after it
+creates the channel) and stage-1 bots read it from `config.json` when they need it; it is
+never baked into their texts. All other keys are used by optional bots that this release
+does not install; `config.example.json` keeps them so those bots still build.
 
 | Key | Meaning | Stage | Required? | Used by | Example (fictional) |
 |---|---|---|---|---|---|
 | `ANALYSIS_DATA_PATH` | Folder where Repository Analyst stores analysis results | optional bots | yes | repository-analyst | `/home/bot/grokbot/data/analysis` |
-| `BOT_MAKER_BOT` | Name of your Bot Maker bot (SendToAgent target) | **stage 1** | yes | main-grok | `Bot Maker` |
+| `BOT_MAKER_BOT` | Name of your Bot Maker bot (SendToAgent target) | **stage 1** | yes | main-grok, mentor | `Bot Maker` |
 | `CVE_NAG_INTERVAL` | How often Reminder nags about an open CVE | optional bots | yes | reminder | `every 2 hours` |
 | `CVE_PACKAGES` | Packages whose CVE notifications Reminder tracks | optional bots | yes | reminder | `openssl, example-lib` |
 | `DAY_OF_WEEK` | Cron day-of-week field for the weekly Projects Manager routine | optional bots | yes | projects-manager | `1` |
 | `HOUR` | Cron hour field used in routine schedules | optional bots | yes | projects-manager, reader-telegram, reader-x, reminder, weekplanner | `9` |
 | `IMPLEMENTER_BOT` | Name of your Implementer bot (SendToAgent target) | optional bots | yes | reader-telegram, reader-x | `Implementer` |
 | `IMPROVEMENTS_CHANNEL` | Channel where bot changes are proposed and approved by the owner | optional bots | yes | implementer, monitor | `#improvements` |
-| `IMPROVEMENTS_CHANNEL_ID` | ID of the improvements channel | optional bots | yes | monitor | `channel-0000-example` |
+| `IMPROVEMENTS_CHANNEL_ID` | ID of the Improvements channel; written by the installer after it creates the channel | **stage 1 (runtime)** | yes | monitor | `channel-0000-example` |
+| `MENTOR_BOT` | Name of your Mentor bot as shown in the sidebar (may be in your language) | **stage 1** | yes | main-grok, mentor | `Mentor` |
 | `MINUTE` | Cron minute field used in routine schedules | optional bots | yes | projects-manager, reader-telegram, reader-x, reminder, weekplanner | `0` |
 | `MONITOR_DATA_PATH` | Folder where Monitor saves weekly report data | optional bots | yes | monitor | `/home/bot/grokbot/data/monitor` |
 | `NOTION_PROJECT_DATABASE` | Notion database that Projects Manager reads | optional bots | yes | projects-manager | `https://www.notion.so/example-workspace/0000000000000000` |
@@ -47,6 +51,6 @@ keeps them so those bots still build.
 | `VIDEO_PROJECT_PATH` | Folder for Director video projects | optional bots | yes | director | `/home/bot/grokbot/videos` |
 | `WEEKLY_REPORT_DAY` | Day Monitor sends the weekly report | optional bots | yes | monitor | `Sunday` |
 | `WEEKLY_REPORT_TIME` | Time (owner timezone) Monitor sends the weekly report | optional bots | yes | monitor | `20:00` |
-| `WORKSPACE_PATH` | Root folder of the bot workspace | **stage 1** | yes | bot-maker, main-grok, monitor, reader-x | `/home/bot/grokbot` |
+| `WORKSPACE_PATH` | Root folder of the bot workspace | **stage 1** | yes | bot-maker, main-grok, mentor, monitor, reader-x | `/home/bot/grokbot` |
 | `X_USERNAME` | X account Reader X reads | optional bots | yes | reader-x | `@example_user` |
 | `X_USER_ID` | Numeric ID of the X account Reader X reads | optional bots | yes | reader-x | `0000000000` |

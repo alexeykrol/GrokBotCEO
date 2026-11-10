@@ -1,7 +1,7 @@
 # Bot Templates
 
-One folder per bot. This release (stage 1) installs only the two core bots; the others stay here
-for later stages and are not offered by the installer.
+One folder per bot. This release (stage 1) installs only the core; the others stay here for later
+stages and are not offered by the installer.
 
 ## Bot structure
 
@@ -10,10 +10,18 @@ for later stages and are not offered by the installer.
 - `prompt.md` — the bot's full text, with `{{KEY}}` placeholders filled from `config.json`
 - `settings.json`, `routines.md` — optional bots only; not used in this release
 
-## Installed in stage 1
+A line `[[block:<name>]]` in a text is replaced by a shared block from [`_blocks/`](_blocks/).
 
-- **[main-grok](main-grok/)** — the user's main assistant; carries the mentor skill; sends bot work to Bot Maker
-- **[bot-maker](bot-maker/)** — creates and changes the user's bots and keeps the repo mirror
+## Stage 1: the core
+
+- **Your main bot** — not a new bot: the installer adds **[main-grok/block.md](main-grok/)** to the
+  default bot you already have (its name stays). Everyday work; sends lasting changes to Improvements.
+- **[bot-maker](bot-maker/)** — creates and changes your bots, agrees every change with you in the
+  Improvements channel, and keeps the repo mirror
+- **[mentor](mentor/)** — shows you around and answers how things work; brings you to your first own bot
+- **The Improvements channel** — you, your main bot and Bot Maker; created at install
+- **[_blocks/routing.md](_blocks/)** — the standard routing block that every core bot carries and
+  Bot Maker adds to every bot it creates
 
 ## Later stages (not offered in this release)
 

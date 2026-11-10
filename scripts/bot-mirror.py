@@ -6,6 +6,9 @@ The bots decide; this script only compares and copies, so exact checks are done 
 
 Commands:
   check     --agent-id ID --expected FILE   print VERIFIED | MISMATCH | NOT VERIFIED
+  list                                      print every bot on the bot computer
+                                            (JSON list of {agent_id, name}); the installer
+                                            uses it to find the user's main bot
   scan      --workspace DIR                 print bots on the bot computer that the mirror
                                             does not know yet (JSON list of {agent_id, name})
   snapshot  --workspace DIR --agent-id ID   copy ONLY name + description of that bot into
@@ -78,7 +81,11 @@ def read_profile(agents_dir: Path, agent_id: str) -> Optional[Dict[str, str]]:
 
 
 def check(agents_dir: Path, agent_id: str, expected_file: Path) -> str:
-    """Write check: the description on disk equals the text that was sent, character by character."""
+    """Write check: the description on disk equals the text that was sent, character by character.
+
+    Grok Bot trims trailing whitespace when it saves a description (verified on a test account,
+    rc2), so trailing whitespace is ignored on both sides. Any other difference is a MISMATCH.
+    """
     try:
         expected = expected_file.read_text(encoding="utf-8")
     except OSError as e:
@@ -86,7 +93,30 @@ def check(agents_dir: Path, agent_id: str, expected_file: Path) -> str:
     profile = read_profile(agents_dir, agent_id)
     if profile is None:
         return "NOT VERIFIED"
-    return "VERIFIED" if profile["description"] == expected else "MISMATCH"
+    return "VERIFIED" if profile["description"].rstrip() == expected.rstrip() else "MISMATCH"
+
+
+def list_bots(agents_dir: Path) -> List[Dict[str, str]]:
+    """Every bot folder with a readable profile.json that has a name.
+
+    The description may be missing (a bot nobody wrote a text for). Folders with group.json are
+    channels, not bots, and are skipped.
+    """
+    try:
+        entries = sorted(d for d in agents_dir.iterdir() if d.is_dir())
+    except OSError as e:
+        raise MirrorError(f"agents folder not readable: {agents_dir}: {e}")
+    found = []
+    for d in entries:
+        if not AGENT_ID_RE.match(d.name) or (d / "group.json").exists():
+            continue
+        try:
+            data = json.loads((d / "profile.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict) and isinstance(data.get("name"), str):
+            found.append({"agent_id": d.name, "name": data["name"]})
+    return found
 
 
 def known_agent_ids(workspace: Path) -> Set[str]:
@@ -110,8 +140,8 @@ def scan(agents_dir: Path, workspace: Path) -> List[Dict[str, str]]:
     known = known_agent_ids(workspace)
     found = []
     for d in entries:
-        if not AGENT_ID_RE.match(d.name) or d.name in known:
-            continue
+        if not AGENT_ID_RE.match(d.name) or d.name in known or (d / "group.json").exists():
+            continue  # group.json: a channel, not a bot
         profile = read_profile(agents_dir, d.name)
         if profile is None:
             continue
@@ -310,7 +340,7 @@ def pack(workspace: Path, out: Path) -> Tuple[Path, str]:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Bookkeeping for the GrokBotCEO repo mirror")
-    parser.add_argument("command", choices=["check", "scan", "snapshot", "pack"])
+    parser.add_argument("command", choices=["check", "list", "scan", "snapshot", "pack"])
     parser.add_argument("--agent-id")
     parser.add_argument("--expected", type=Path, help="file with the exact text sent (check)")
     parser.add_argument("--workspace", type=Path, help="workspace root (scan, snapshot, pack)")
@@ -323,6 +353,8 @@ def main(argv=None) -> int:
             if not args.agent_id or not args.expected:
                 raise MirrorError("check needs --agent-id and --expected")
             print(check(args.agents_dir, args.agent_id, args.expected))
+        elif args.command == "list":
+            print(json.dumps(list_bots(args.agents_dir), indent=2, ensure_ascii=False))
         elif args.command == "scan":
             if not args.workspace:
                 raise MirrorError("scan needs --workspace")

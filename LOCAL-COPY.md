@@ -1,6 +1,6 @@
 # Local copy — the repo on the user's own computer
 
-**Reader:** the installer ([LOADING-INSTRUCTIONS.md](LOADING-INSTRUCTIONS.md), step 10) and Bot Maker.
+**Reader:** the installer ([LOADING-INSTRUCTIONS.md](LOADING-INSTRUCTIONS.md), step 13) and Bot Maker.
 This is a procedure for the bot, not a page for the user.
 
 The user can have a **read-only copy** of their repo on their own computer. The repo itself stays
@@ -22,11 +22,11 @@ computer"):
 1. Tell the user about the permission question (next section).
 2. On the user's computer run `uname -s && echo "$HOME"`. `Darwin` is a Mac, `Linux` is Linux.
    Anything else, or no answer: not supported yet; stop here.
-3. Suggest `<home>/GrokBotCEO-copy`, where `<home>` is the folder printed. Let the user change it.
+3. Suggest `<home>/GrokBotCEO`, where `<home>` is the folder printed. Let the user change it.
    The path must start with `/` and must not contain quotes, `$`, backticks, backslashes or line
    breaks. It must be a new folder or an earlier copy, never a folder with the user's files.
-4. Write `local-copy.json`, then `git add local-copy.json` and commit with the line
-   `Bot: <your bot name>` at the end of the message.
+4. Write `local-copy.json`, then `git add local-copy.json` and commit; the message records the
+   user's exact yes words, `(yes: "<exact words>")`, and ends with the line `Bot: <your bot name>`.
 5. Make the first copy (below).
 
 ## Permission on the user's computer

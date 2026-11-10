@@ -26,13 +26,13 @@ Each bot folder contains:
 
 **Via shared data:** Readers write to stats.db, Monitor reads from it.
 
-**Via "group chats":** Some bots post proposals to an "Improvements" chat where Bot Maker and owner collaborate.
+**Via channels:** the core installs an Improvements channel (you, your main bot and Bot Maker). Any bot that hears a request to change something for good passes it there; Bot Maker clarifies it, shows each change as WHAT / WHERE / WHY and applies it only after your own yes.
 
 ## Anti-Jobs
 
 Each bot prompt lists "anti-jobs" — things it specifically does NOT do. This prevents role overlap and keeps bots focused.
 
-Example: Main Grok never owns routines or tracks recurring processes; specialized bots handle that.
+Example: your main bot never owns routines or tracks recurring processes; specialized bots handle that.
 
 ## Routines vs Bots
 
@@ -47,7 +47,7 @@ When you need a new bot, check the test:
   → Yes = new bot  
   → No = skill or function in existing bot
 
-Bot Maker creates new bots after owner approval.
+Bot Maker creates new bots after your approval, and adds the standard routing block to each of them, so every bot passes lasting changes on to Improvements.
 
 ---
 

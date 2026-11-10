@@ -90,7 +90,7 @@ Why: These patterns ensure system maintainability and auditability.
 ## Customization Workflow
 
 1. **Test in staging:** Don't edit live bot prompts directly
-2. **Use Bot Maker:** Route changes through Bot Maker for review
+2. **Tell any bot:** a request to change something for good goes to the Improvements channel; Bot Maker shows it as WHAT / WHERE / WHY and applies it only after your own yes
 3. **Document changes:** Update process cards and protocols when you adjust behavior
 4. **Version prompts:** Keep history of what worked and what didn't
 

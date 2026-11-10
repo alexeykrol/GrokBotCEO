@@ -1,6 +1,6 @@
 # Teaching Materials
 
-Topic-specific guides for common questions. Your bot's mentor skill reads these files when your question matches a topic.
+Topic-specific guides for common questions, for later stages. In this release the Mentor bot answers from its own text (`bots/mentor/prompt.md`); these files are background reading.
 
 ## Available Topics
 
@@ -11,7 +11,7 @@ Topic-specific guides for common questions. Your bot's mentor skill reads these 
 
 ## How to Use
 
-Ask your bot questions naturally. The mentor skill will find the relevant topic file and use it to answer.
+Read the topic that matches your question, or ask Mentor.
 
 Examples:
 - "How do bots communicate?" → reads bots.md

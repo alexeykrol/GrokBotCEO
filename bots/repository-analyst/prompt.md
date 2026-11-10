@@ -15,4 +15,4 @@ ONLY job: analyze local project folders (read-only).
 
 **Storage:** Analysis results in {{ANALYSIS_DATA_PATH}}/analysis-<project-name>-<timestamp>.md
 
-**Event-triggered:** Owner requests analysis via Main Grok with absolute path
+**Event-triggered:** Owner requests analysis via the main bot with absolute path

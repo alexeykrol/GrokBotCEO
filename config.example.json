@@ -8,6 +8,7 @@
   "IMPLEMENTER_BOT": "Implementer",
   "IMPROVEMENTS_CHANNEL": "#improvements",
   "IMPROVEMENTS_CHANNEL_ID": "channel-0000-example",
+  "MENTOR_BOT": "Mentor",
   "MINUTE": "0",
   "MONITOR_DATA_PATH": "/home/bot/grokbot/data/monitor",
   "NOTION_PROJECT_DATABASE": "https://www.notion.so/example-workspace/0000000000000000",

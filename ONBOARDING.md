@@ -3,8 +3,9 @@
 **Version:** see [VERSION](VERSION) · **You need:** a Grok Bot account · **Time:** 20–30 minutes
 
 GrokBotCEO is a ready set of Grok Bot bots for running a business and a product. This release is
-the core: two bots, a repo that mirrors your system, and a short tour that ends with your first own
-bot. You install it by pasting one command into your Grok Bot chat. After that the bots are yours.
+the core: your own main bot learns the system, two new bots (Bot Maker and Mentor), a channel
+where changes are agreed, a repo that mirrors your system, and a short tour that ends with your
+first own bot. You install it by pasting one command into your Grok Bot chat. After that the bots are yours.
 
 Русская версия: [ONBOARDING.ru.md](ONBOARDING.ru.md).
 
@@ -27,46 +28,53 @@ Rules:
 
 ## 2. Check one setting
 
-The bot fills in `config.json` itself: the path of your workspace and the name of Bot Maker. It
-shows you the file; correct the path only if it is wrong. Nothing else is asked. The file stays on
+The bot fills in `config.json` itself: the path of your workspace and the names of Bot Maker and
+Mentor. It tells you the folder; correct it only if it is wrong. Nothing else is asked. The file stays on
 your Grok Bot computer (and in the optional copy on your own computer): it is never sent anywhere
 else and updates never touch it.
 
 ## 3. Approve the plan
 
-The bot shows what it will create:
+If you have more than one bot, it first asks which one is your main bot. Then it shows the plan:
 
-| Bot | What it does |
+| What | What it does |
 |---|---|
-| Main Grok | your main assistant; gives the tour and answers how things work |
-| Bot Maker | creates and changes bots for you |
+| your main bot | not a new bot: it learns GrokBotCEO and keeps its name |
+| Bot Maker (new) | creates and changes bots for you |
+| Mentor (new) | shows you around and answers how things work |
+| Improvements channel (new) | you, your main bot and Bot Maker; changes are agreed here |
 
 Plus a git repo in your workspace that mirrors your system. Type `yes`.
 
-## 4. The bot creates the bots
+## 4. The bot does it
 
 For each bot it prints one line: `created · VERIFIED`, `created · MISMATCH` or
-`created · NOT VERIFIED`. After creating a bot, the installer reads the bot's file on the bot
+`created · NOT VERIFIED` (for your main bot: `extended · ...`). After creating a bot, the installer reads the bot's file on the bot
 computer and compares its text with what was sent. `VERIFIED` means they are equal, `MISMATCH`
 means they differ. `NOT VERIFIED` means the file could not be read, so nothing could be compared;
-the bot is still created. Then it saves both bots to the repo and makes the first commit.
+the bot is still created. Then it creates the Improvements channel, saves everything to the repo
+(including your main bot's old text, so it can be rolled back) and makes the first commit. If
+something does not work (for example, the channel or the change to your main bot), it says so in
+one line and goes on; Bot Maker can do it later.
 
 Then it offers a read-only copy of the repo on your own computer (Mac or Linux), refreshed after
 every change: say yes or no. If yes, Grok Bot asks "Allow Grok Bot and all Bots to run commands on
 your local computer?"; "Allow once" is enough.
 
-## 5. Take the tour and make your first bot
+## 5. Open Mentor, take the tour and make your first bot
 
-The tour starts right away, a step or two at a time:
+At the end the bot tells you to open Mentor in the list on the left. Mentor shows you around, one
+step at a time:
 
 1. what is installed and where;
 2. four ideas: bot, channel, routine, connection;
-3. the golden rule: to change a bot for good, tell Bot Maker, not the bot itself;
+3. the golden rule: to change something for good, tell any bot; it passes the request to Bot
+   Maker, which agrees it with you in Improvements and changes nothing before your "yes";
 4. your first own bot: pick a simple job, tell Bot Maker, say `yes`;
 5. how to look at your system, and what comes next.
 
-There are no routines to set up in this release. You can restart the tour any time: say "tour" to
-Main Grok.
+There are no routines to set up in this release. You can come back to Mentor any time and say
+"show me around".
 
 ---
 
@@ -78,13 +86,14 @@ Main Grok.
   config.json         your values
   local-copy.json     optional: where the copy on your own computer is
   VERSION             the installed version
-  bots/core/          Main Grok and Bot Maker as installed: text and a small record each
+  bots/core/          your main bot (its text now and before), Bot Maker and Mentor: text and a small record each
   bots/my/            bots you make through Bot Maker
   bots/marketplace/   copies (name and text only) of bots you import from the marketplace
+  channels/           one file per channel: id, members, purpose
   build/              texts compiled from the release and your config (regenerated any time)
 ```
 
-Every change Bot Maker makes is a commit, and each commit says which bot made it. Imported a bot
+Every change Bot Maker makes is a commit; each commit says which bot made it and quotes your "yes". Imported a bot
 from the marketplace? Tell Bot Maker "I installed a bot": there is no automatic signal for that.
 A copy on GitHub is optional and comes later.
 
@@ -105,5 +114,6 @@ or ask Bot Maker to carry your change into the new version.
 
 ## Help
 
-- Ask Main Grok: "tour", "what do I have installed", or any question about how it works
+- Ask Mentor: "show me around", or any question about how it works
+- Ask your main bot: "what do I have installed"
 - `bots/<bot>/prompt.md` — what each bot does and what it never does

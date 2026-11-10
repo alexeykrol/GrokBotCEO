@@ -1,0 +1,4 @@
+{
+  "name": "{{MENTOR_BOT}}",
+  "_comment": "Name only, from config.json (Mentor, or the same word in the user's language). The bot's text lives in prompt.md."
+}

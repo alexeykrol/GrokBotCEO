@@ -28,7 +28,7 @@ Task Manager does NOT:
 - `README.md` — This file (role and setup notes)
 - `profile.json` — Bot configuration *(template in progress)*
 - `prompt.md` — Coding standards and workflow *(template in progress)*
-- No routines (event-triggered by owner requests via Main Grok)
+- No routines (event-triggered by owner requests via the main bot)
 
 ## Setup Notes
 

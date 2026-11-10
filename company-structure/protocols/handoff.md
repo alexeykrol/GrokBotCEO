@@ -18,9 +18,10 @@ Every handoff message must include:
 HANDOFF from=<sending-bot> to=<receiving-bot> item=<link-or-id> why=<1-phrase-reason> done=<completion-criterion> deadline=<date-or-none> approval=<yes-or-no>
 ```
 
-**Example:**
+**Example** (the main bot passes a lasting change on to the Improvements channel, where Bot Maker
+picks it up):
 ```
-HANDOFF from=Reader-X to=Implementer item=https://x.com/user/status/123 why=agent-tool-post-for-analysis done=analysis-posted-to-improvements deadline=2026-11-10 approval=yes
+HANDOFF from=Main-bot to=Bot-Maker item=improvements-channel why=lasting-rule-for-a-bot done=change-committed-after-users-yes deadline=— approval=yes
 ```
 
 ### Field Definitions
@@ -51,15 +52,14 @@ Beyond HANDOFF line, include:
 - What receiving bot should NOT do (if not obvious)
 - Expected outcome format
 
-**Good example:**
+**Good example** (sent with SendToAgent to the Improvements channel):
 ```
-HANDOFF from=Reader-X to=Implementer item=https://x.com/user/status/123 why=cursor-agent-post-with-novel-approach done=analysis-in-improvements-channel deadline=— approval=yes
+HANDOFF from=Main-bot to=Bot-Maker item=improvements-channel why=new-routine-needs-an-owner-bot done=bot-created-and-committed-after-users-yes deadline=— approval=yes
 
-Post describes new agent testing framework "agentic-bench". 
-Article full text saved to /data/articles/123.md (opened successfully).
-Scored ★4 (practical tool, clear adoption path).
-Analyze: what it does, how we'd use it, implementation effort.
-Do NOT install or test yet - analysis only for now.
+The user wants a short summary of their unread newsletters every Monday at 9.
+Worked out with the user: job = weekly newsletter summary; owner = a new bot (none fits);
+trigger = schedule, Monday 9:00; input = newsletters from the last 7 days; output = 5 bullets in chat.
+Do NOT turn the routine on: the new bot sets it up itself after the user's yes.
 ```
 
 ## Anti-Patterns

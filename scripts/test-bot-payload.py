@@ -51,8 +51,9 @@ class TestPayloadCreate(unittest.TestCase):
         payload = json.loads(result.stdout)
         
         # Must use prompt.md, not profile.description
-        self.assertEqual(payload["description"], canonical_persona, "Full canonical persona from prompt.md must be preserved")
-        self.assertEqual(len(payload["description"]), len(canonical_persona))
+        # trailing whitespace is trimmed: Grok Bot trims it on save
+        self.assertEqual(payload["description"], canonical_persona.rstrip(), "Full canonical persona from prompt.md must be preserved")
+        self.assertEqual(len(payload["description"]), len(canonical_persona.rstrip()))
     
     def test_metadata_stripped(self):
         """Metadata fields must NOT appear in payload"""
@@ -288,7 +289,7 @@ class TestPlan(unittest.TestCase):
         # Check plan content
         self.assertIn("Installation Plan", result.stdout)
         self.assertIn("Test Bot", result.stdout)
-        self.assertIn(f"{len(canonical_persona)} characters", result.stdout)
+        self.assertIn(f"{len(canonical_persona.rstrip())} characters", result.stdout)
         self.assertIn("Metadata stripped", result.stdout)
         self.assertIn("title", result.stdout.lower())
         self.assertIn("Manual configuration required", result.stdout)
@@ -313,6 +314,7 @@ class TestActualBotTemplates(unittest.TestCase):
             "--param", "READER_X_BOT=@reader-x",
             "--param", "REMINDER_BOT=@reminder",
             "--param", "BOT_MAKER_BOT=@bot-maker",
+            "--param", "MENTOR_BOT=Mentor",
             "--param", "TASK_MANAGER_BOT=@task-manager",
             "--param", "REPOSITORY_ANALYST_BOT=@repository-analyst",
             "--param", "TRANSLATOR_BOT=@translator",
@@ -393,6 +395,7 @@ class TestCanonicalPersonaIdentities(unittest.TestCase):
             "--param", "READER_X_BOT=@reader-x",
             "--param", "REMINDER_BOT=@reminder",
             "--param", "BOT_MAKER_BOT=@bot-maker",
+            "--param", "MENTOR_BOT=Mentor",
             "--param", "TASK_MANAGER_BOT=@task-manager",
             "--param", "REPOSITORY_ANALYST_BOT=@repository-analyst",
             "--param", "TRANSLATOR_BOT=@translator",
@@ -950,9 +953,13 @@ class TestPersonaSource(unittest.TestCase):
         for bot_dir in sorted(d for d in REAL_BOTS_DIR.iterdir() if (d / "profile.json").exists()):
             with self.subTest(bot=bot_dir.name):
                 expected = (bot_dir / "prompt.md").read_text(encoding="utf-8")
+                for block in sorted((REAL_BOTS_DIR / "_blocks").glob("*.md")):
+                    expected = expected.replace("[[block:" + block.stem + "]]",
+                                                block.read_text(encoding="utf-8").strip())
                 for key, value in config.items():
                     expected = expected.replace("{{" + key + "}}", value)
-                self.assertEqual((out / f"{bot_dir.name}.md").read_text(encoding="utf-8"), expected)
+                # trailing whitespace is trimmed: Grok Bot trims it on save
+                self.assertEqual((out / f"{bot_dir.name}.md").read_text(encoding="utf-8"), expected.rstrip())
 
 
 class TestConfigFile(unittest.TestCase):
@@ -1056,7 +1063,7 @@ class TestBuild(unittest.TestCase):
             self.assertEqual(set(payload), {"name", "description"})
             self.assertEqual(payload["name"], name)
             self.assertEqual((out / f"{bot_id}.md").read_text(encoding="utf-8"), payload["description"])
-        self.assertEqual((out / "beta.md").read_text(encoding="utf-8"), "Beta persona, timezone UTC\n")
+        self.assertEqual((out / "beta.md").read_text(encoding="utf-8"), "Beta persona, timezone UTC")
 
     def test_build_section_id(self):
         out = self.tmp / "out"
@@ -1175,7 +1182,8 @@ MIRROR_SCRIPT = SCRIPT_DIR / "bot-mirror.py"
 
 
 class TestStage1(unittest.TestCase):
-    """rc2 = stage 1: only main-grok and bot-maker are installed, with stage-1 keys only"""
+    """rc3 = stage 1: Bot Maker and Mentor are created, the user's main bot is extended with
+    bots/main-grok/block.md; only stage-1 keys are written at install"""
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -1184,54 +1192,93 @@ class TestStage1(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
+    def _stage1_config(self, skip=None):
+        keys = self.compiler.stage1_keys(REAL_BOTS_DIR)
+        config = self.tmp / f"config-{skip or 'all'}.json"
+        config.write_text(json.dumps({k: self.compiler.KEY_DOCS[k][1] for k in keys if k != skip}))
+        return config
+
     def test_stage1_bots(self):
-        self.assertEqual(tuple(self.compiler.STAGE1_BOTS), ("main-grok", "bot-maker"))
+        self.assertEqual(tuple(self.compiler.STAGE1_BOTS), ("bot-maker", "mentor"))
+        self.assertEqual(tuple(self.compiler.STAGE1_EXTENDED), ("main-grok",))
+        self.assertEqual(self.compiler.list_extension_ids(REAL_BOTS_DIR), ["main-grok"])
+        self.assertNotIn("main-grok", self.compiler.list_bot_ids(REAL_BOTS_DIR),
+                         "main-grok must not be a bot of its own (no second main bot)")
+        self.assertFalse((REAL_BOTS_DIR / "main-grok" / "profile.json").exists())
+        self.assertFalse((REAL_BOTS_DIR / "main-grok" / "prompt.md").exists())
 
     def test_stage1_keys(self):
-        """The installer fills exactly these keys itself (LOADING-INSTRUCTIONS step 4)"""
+        """The installer fills exactly these keys itself (LOADING-INSTRUCTIONS step 5)"""
         keys = self.compiler.stage1_keys(REAL_BOTS_DIR)
-        self.assertEqual(keys, ["BOT_MAKER_BOT", "WORKSPACE_PATH"])
+        self.assertEqual(keys, ["BOT_MAKER_BOT", "MENTOR_BOT", "WORKSPACE_PATH"])
         loading = (ROOT_DIR / "LOADING-INSTRUCTIONS.md").read_text(encoding="utf-8")
-        for key in keys:
+        for key in keys + sorted(self.compiler.RUNTIME_KEYS):
             self.assertIn(f"`{key}`", loading)
 
     def test_build_with_only_stage1_keys(self):
-        keys = self.compiler.stage1_keys(REAL_BOTS_DIR)
-        config = self.tmp / "config.json"
-        config.write_text(json.dumps({k: self.compiler.KEY_DOCS[k][1] for k in keys}))
         out = self.tmp / "build"
-        r = _run("build", "--config", config, "--bots", "main-grok,bot-maker", "--out", out)
+        r = _run("build", "--config", self._stage1_config(), "--bots", "bot-maker,mentor", "--out", out)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(sorted(p.name for p in out.iterdir()),
-                         ["bot-maker.md", "bot-maker.payload.json", "main-grok.md", "main-grok.payload.json"])
+                         ["bot-maker.md", "bot-maker.payload.json", "mentor.md", "mentor.payload.json"])
         names = {json.loads((out / f"{b}.payload.json").read_text(encoding="utf-8"))["name"]
-                 for b in ("main-grok", "bot-maker")}
-        self.assertEqual(names, {"Main Grok", "Bot Maker"})
+                 for b in ("bot-maker", "mentor")}
+        self.assertEqual(names, {"Mentor", "Bot Maker"})
         for md in out.glob("*.md"):
             text = md.read_text(encoding="utf-8")
             self.assertNotIn("{{", text, md.name)
+            self.assertNotIn("[[block:", text, md.name)
+            self.assertEqual(text, text.rstrip(), f"{md.name}: Grok Bot trims trailing whitespace")
             self.assertNotIn("}}", text, md.name)
 
+    def test_mentor_name_comes_from_config(self):
+        """MENTOR_BOT may be in the user's language; it becomes the name in the sidebar"""
+        config = self.tmp / "config.json"
+        config.write_text(json.dumps({"WORKSPACE_PATH": "/workspace", "BOT_MAKER_BOT": "Bot Maker",
+                                      "MENTOR_BOT": "Ментор"}, ensure_ascii=False), encoding="utf-8")
+        out = self.tmp / "build"
+        r = _run("build", "--config", config, "--bots", "mentor", "--out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        payload = json.loads((out / "mentor.payload.json").read_text(encoding="utf-8"))
+        self.assertEqual(payload["name"], "Ментор")
+        self.assertTrue(payload["description"].startswith("You are Ментор,"))
+
+    def test_mentor_is_short_enough(self):
+        out = self.tmp / "build"
+        r = _run("build", "--config", self._stage1_config(), "--bots", "mentor", "--out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        text = (out / "mentor.md").read_text(encoding="utf-8")
+        self.assertLessEqual(len(text), 5200, f"Mentor text is {len(text)} chars (target ~5k)")
+
     def test_stage1_build_fails_without_a_stage1_key(self):
-        keys = self.compiler.stage1_keys(REAL_BOTS_DIR)
-        for missing in keys:
+        agents = _agents_with(self.tmp, "main-0001", {"name": "Grok", "description": "Old text"})
+        ok = _run("extend", "--bot", "main-grok", "--agent-id", "main-0001", "--agents-dir", agents,
+                  "--config", self._stage1_config(), "--out", self.tmp / "ok")
+        self.assertEqual(ok.returncode, 0, ok.stderr)
+        for missing in self.compiler.stage1_keys(REAL_BOTS_DIR):
             with self.subTest(missing=missing):
-                config = self.tmp / f"config-{missing}.json"
-                config.write_text(json.dumps({k: self.compiler.KEY_DOCS[k][1] for k in keys if k != missing}))
                 out = self.tmp / f"out-{missing}"
-                r = _run("build", "--config", config, "--bots", "main-grok,bot-maker", "--out", out)
+                r = _run("build", "--config", self._stage1_config(skip=missing),
+                         "--bots", "bot-maker,mentor", "--out", out)
                 self.assertNotEqual(r.returncode, 0)
                 self.assertIn(missing, r.stderr)
+                ext = _run("extend", "--bot", "main-grok", "--agent-id", "main-0001", "--agents-dir", agents,
+                           "--config", self._stage1_config(skip=missing), "--out", out)
+                self.assertNotEqual(ext.returncode, 0)
+                self.assertIn(missing, ext.stderr)
                 self.assertFalse(out.exists())
 
     def test_stage1_prompts_name_no_uninstalled_bot(self):
-        """Stage-1 bots must not route to bots this release does not install"""
+        """Stage-1 texts must not route to bots this release does not install"""
         import re
-        for bot in self.compiler.STAGE1_BOTS:
-            with self.subTest(bot=bot):
-                text = (REAL_BOTS_DIR / bot / "prompt.md").read_text(encoding="utf-8")
+        sources = [REAL_BOTS_DIR / b / "prompt.md" for b in self.compiler.STAGE1_BOTS]
+        sources += [REAL_BOTS_DIR / b / "block.md" for b in self.compiler.STAGE1_EXTENDED]
+        sources += sorted((REAL_BOTS_DIR / "_blocks").glob("*.md"))
+        for path in sources:
+            with self.subTest(file=str(path.relative_to(REAL_BOTS_DIR))):
+                text = path.read_text(encoding="utf-8")
                 bot_keys = set(re.findall(r"\{\{([A-Z_]+_BOT)\}\}", text))
-                self.assertLessEqual(bot_keys, {"BOT_MAKER_BOT"})
+                self.assertLessEqual(bot_keys, {"BOT_MAKER_BOT", "MENTOR_BOT"})
 
     def test_schema_marks_stage1_keys(self):
         keys = set(self.compiler.stage1_keys(REAL_BOTS_DIR))
@@ -1239,15 +1286,288 @@ class TestStage1(unittest.TestCase):
         for key in self.compiler.ALLOWED_PLACEHOLDER_KEYS:
             row = next(l for l in schema.splitlines() if l.startswith(f"| `{key}` |"))
             if key in keys:
-                self.assertIn("**stage 1**", row)
+                self.assertIn("| **stage 1** |", row)
+            elif key in self.compiler.RUNTIME_KEYS:
+                self.assertIn("| **stage 1 (runtime)** |", row)
             else:
                 self.assertIn("optional bots", row)
 
     def test_loading_instructions_use_repo_mirror(self):
         loading = (ROOT_DIR / "LOADING-INSTRUCTIONS.md").read_text(encoding="utf-8")
-        for needle in ["--bots main-grok,bot-maker", "~/agent-data/agents/<agent_id>/profile.json",
-                       "bots/core/", "bots/my/", "bots/marketplace/", "git init", "Bot: "]:
+        for needle in ["--bots bot-maker,mentor", "extend", "--bot main-grok",
+                       "~/agent-data/agents/<agent_id>/profile.json", "bot-mirror.py list",
+                       "bots/core/", "bots/my/", "bots/marketplace/", "channels/improvements.md",
+                       "previous.md", "NOT APPLIED", "CreateChannel", "git init", "Bot: ", '(yes: \\"']:
             self.assertIn(needle, loading)
+        for gone in ["skills/mentor", "Main Grok", "mentor tour", "mentor skill"]:
+            self.assertNotIn(gone, loading)
+
+
+class TestBlocks(unittest.TestCase):
+    """[[block:<name>]] includes from bots/_blocks/, one level only"""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.bots = self.tmp / "bots"
+        (self.bots / "_blocks").mkdir(parents=True)
+        (self.bots / "_blocks" / "routing.md").write_text("Route lasting changes. Workspace {{WORKSPACE_PATH}}.\n")
+        self.config = self.tmp / "config.json"
+        self.config.write_text(json.dumps({"WORKSPACE_PATH": "/srv/test"}))
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_block_is_expanded_and_resolved(self):
+        _make_bot(self.bots, "alpha", "Alpha bot.\n\n[[block:routing]]\n")
+        out = self.tmp / "out"
+        r = _run("build", "--config", self.config, "--bots", "alpha", "--bots-dir", self.bots, "--out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual((out / "alpha.md").read_text(), "Alpha bot.\n\nRoute lasting changes. Workspace /srv/test.")
+
+    def test_blocks_folder_is_not_a_bot(self):
+        _make_bot(self.bots, "alpha", "Alpha bot.")
+        out = self.tmp / "out"
+        r = _run("build", "--config", self.config, "--bots", "all", "--bots-dir", self.bots, "--out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(sorted(p.name for p in out.iterdir()), ["alpha.md", "alpha.payload.json"])
+
+    def test_unknown_or_nested_block_rejected(self):
+        (self.bots / "_blocks" / "nested.md").write_text("x [[block:routing]]")
+        for name, text in [("unknown", "[[block:nope]]"), ("nested", "[[block:nested]]"),
+                           ("badname", "[[block:../x]]")]:
+            with self.subTest(case=name):
+                bots = self.tmp / f"bots-{name}"
+                shutil.copytree(self.bots / "_blocks", bots / "_blocks")
+                _make_bot(bots, "alpha", text)
+                out = self.tmp / f"out-{name}"
+                r = _run("build", "--config", self.config, "--bots", "alpha", "--bots-dir", bots, "--out", out)
+                self.assertNotEqual(r.returncode, 0)
+                self.assertIn("block", r.stderr)
+                self.assertFalse(out.exists())
+
+
+def _agents_with(tmp, agent_id, profile):
+    d = Path(tmp) / "agents" / agent_id
+    d.mkdir(parents=True)
+    (d / "profile.json").write_text(json.dumps(profile, ensure_ascii=False), encoding="utf-8")
+    return Path(tmp) / "agents"
+
+
+class TestExtendMainBot(unittest.TestCase):
+    """extend: the user's own main bot gets our block appended; no second main bot"""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.compiler = _load_compiler_module()
+        keys = self.compiler.stage1_keys(REAL_BOTS_DIR)
+        self.config = self.tmp / "config.json"
+        self.config.write_text(json.dumps({k: self.compiler.KEY_DOCS[k][1] for k in keys}))
+        self.old = "A teammate with its own computer that takes real work off your plate.\n\n  \n"
+        self.agents = _agents_with(self.tmp, "main-0001",
+                                   {"name": "My Grok", "description": self.old, "namedBy": "user"})
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _extend(self, out, agent_id="main-0001", agents=None):
+        return _run("extend", "--bot", "main-grok", "--agent-id", agent_id, "--agents-dir", agents or self.agents,
+                    "--config", self.config, "--out", out)
+
+    def _resolved_block(self):
+        config = json.loads(self.config.read_text())
+        block = (REAL_BOTS_DIR / "main-grok" / "block.md").read_text(encoding="utf-8")
+        routing = (REAL_BOTS_DIR / "_blocks" / "routing.md").read_text(encoding="utf-8").strip()
+        block = block.replace("[[block:routing]]", routing)
+        for key, value in config.items():
+            block = block.replace("{{" + key + "}}", value)
+        return block.strip()
+
+    def test_combined_text_previous_kept_rstripped(self):
+        out = self.tmp / "build"
+        r = self._extend(out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(sorted(p.name for p in out.iterdir()),
+                         ["main-grok.md", "main-grok.payload.json", "main-grok.previous.md"])
+        self.assertEqual((out / "main-grok.previous.md").read_text(encoding="utf-8"), self.old)
+        combined = self.old.rstrip() + "\n\n" + self._resolved_block()
+        self.assertEqual((out / "main-grok.md").read_text(encoding="utf-8"), combined)
+        payload = json.loads((out / "main-grok.payload.json").read_text(encoding="utf-8"))
+        self.assertEqual(payload, {"agent_id": "main-0001", "description": combined})
+        self.assertNotIn("name", payload, "the main bot keeps its name")
+        self.assertEqual(combined, combined.rstrip())
+        self.assertNotIn("{{", combined)
+        self.assertNotIn("[[block:", combined)
+
+    def test_write_check_against_combined_text(self):
+        out = self.tmp / "build"
+        self.assertEqual(self._extend(out).returncode, 0)
+        combined = (out / "main-grok.md").read_text(encoding="utf-8")
+        profile = self.agents / "main-0001" / "profile.json"
+        profile.write_text(json.dumps({"name": "My Grok", "description": combined}), encoding="utf-8")
+        r = _mirror("check", "--agent-id", "main-0001", "--expected", out / "main-grok.md", "--agents-dir", self.agents)
+        self.assertEqual(r.stdout.strip(), "VERIFIED")
+        r = _mirror("check", "--agent-id", "main-0001", "--expected", out / "main-grok.previous.md",
+                    "--agents-dir", self.agents)
+        self.assertEqual(r.stdout.strip(), "MISMATCH")
+
+    def test_empty_old_text_gives_block_only(self):
+        agents = _agents_with(self.tmp / "e", "main-0002", {"name": "Grok"})
+        out = self.tmp / "build"
+        r = self._extend(out, "main-0002", agents)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual((out / "main-grok.previous.md").read_text(encoding="utf-8"), "")
+        self.assertEqual((out / "main-grok.md").read_text(encoding="utf-8"), self._resolved_block())
+
+    def test_refuses_without_current_text_or_twice(self):
+        out = self.tmp / "build"
+        r = self._extend(out, "missing-bot")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("not extended", r.stderr)
+        self.assertFalse(out.exists(), "nothing may be written when the old text is unknown")
+        self.assertEqual(self._extend(out).returncode, 0)
+        combined = (out / "main-grok.md").read_text(encoding="utf-8")
+        (self.agents / "main-0001" / "profile.json").write_text(json.dumps({"name": "x", "description": combined}))
+        r = self._extend(self.tmp / "again")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("already contains", r.stderr)
+        for bad in ["../x", ""]:
+            self.assertNotEqual(self._extend(self.tmp / "bad", bad).returncode, 0)
+
+    def test_extend_only_extension_blocks(self):
+        r = _run("extend", "--bot", "bot-maker", "--agent-id", "main-0001", "--agents-dir", self.agents,
+                 "--config", self.config, "--out", self.tmp / "x")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("not an extension block", r.stderr)
+
+
+class TestComposeUserBot(unittest.TestCase):
+    """compose: every bot Bot Maker creates gets the routing block"""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.compiler = _load_compiler_module()
+        keys = self.compiler.stage1_keys(REAL_BOTS_DIR)
+        self.config = self.tmp / "config.json"
+        self.config.write_text(json.dumps({k: self.compiler.KEY_DOCS[k][1] for k in keys}))
+        self.draft = self.tmp / "draft.md"
+        self.draft.write_text("You draft short polite replies. Never send anything yourself.\n\n", encoding="utf-8")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _compose(self, text_file, out, slug="polite-replies", name="Polite Replies"):
+        return _run("compose", "--config", self.config, "--name", name, "--text", text_file,
+                    "--slug", slug, "--out", out)
+
+    def _routing(self):
+        config = json.loads(self.config.read_text())
+        block = (REAL_BOTS_DIR / "_blocks" / "routing.md").read_text(encoding="utf-8").strip()
+        for key, value in config.items():
+            block = block.replace("{{" + key + "}}", value)
+        return block
+
+    def test_routing_block_appended(self):
+        out = self.tmp / "build"
+        r = self._compose(self.draft, out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        text = (out / "polite-replies.md").read_text(encoding="utf-8")
+        self.assertEqual(text, "You draft short polite replies. Never send anything yourself.\n\n" + self._routing())
+        payload = json.loads((out / "polite-replies.payload.json").read_text(encoding="utf-8"))
+        self.assertEqual(payload, {"name": "Polite Replies", "description": text})
+        self.assertIn("IMPROVEMENTS_CHANNEL_ID", text)
+        self.assertNotIn("channel-0000-example", text, "the channel id is never baked in")
+
+    def test_idempotent_on_change(self):
+        out = self.tmp / "build"
+        self.assertEqual(self._compose(self.draft, out).returncode, 0)
+        first = (out / "polite-replies.md").read_text(encoding="utf-8")
+        again = self.tmp / "again.md"
+        again.write_text(first + "\n", encoding="utf-8")
+        self.assertEqual(self._compose(again, self.tmp / "b2").returncode, 0)
+        self.assertEqual((self.tmp / "b2" / "polite-replies.md").read_text(encoding="utf-8"), first)
+
+    def test_user_text_is_not_template_resolved(self):
+        raw = self.tmp / "raw.md"
+        raw.write_text("Explain {{this}} literally.", encoding="utf-8")
+        out = self.tmp / "build"
+        r = self._compose(raw, out, slug="объяснялка", name="Объяснялка")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue((out / "объяснялка.md").read_text(encoding="utf-8").startswith("Explain {{this}} literally."))
+
+    def test_bad_input_rejected(self):
+        empty = self.tmp / "empty.md"
+        empty.write_text("  \n")
+        for args in [(empty, self.tmp / "o1"), (self.draft, self.tmp / "o2", "../x"),
+                     (self.draft, self.tmp / "o3", "polite", " ")]:
+            with self.subTest(args=args[2:]):
+                self.assertNotEqual(self._compose(*args).returncode, 0)
+                self.assertFalse(args[1].exists())
+
+
+class TestRc3Mechanics(unittest.TestCase):
+    """The routing block is in every stage-1 text; Mentor replaces the mentor skill"""
+
+    def setUp(self):
+        self.routing = (REAL_BOTS_DIR / "_blocks" / "routing.md").read_text(encoding="utf-8")
+
+    def test_routing_block_reads_channel_id_at_run_time(self):
+        self.assertIn("IMPROVEMENTS_CHANNEL_ID", self.routing)
+        self.assertIn("{{WORKSPACE_PATH}}/config.json", self.routing)
+        self.assertNotIn("{{IMPROVEMENTS_CHANNEL_ID}}", self.routing)
+        self.assertIn("SendToAgent", self.routing)
+        self.assertIn("bots/core/bot-maker/agent.json", self.routing, "fallback: Bot Maker by agent id")
+        self.assertIn("say:", self.routing, "last fallback: the exact sentence for the user")
+        self.assertIn("memory", self.routing, "facts still go to memory")
+
+    def test_routing_block_in_main_block_and_mentor(self):
+        for path in [REAL_BOTS_DIR / "main-grok" / "block.md", REAL_BOTS_DIR / "mentor" / "prompt.md"]:
+            with self.subTest(file=path.parent.name):
+                self.assertIn("[[block:routing]]", path.read_text(encoding="utf-8"))
+
+    def test_no_stage1_text_bakes_the_channel_id(self):
+        for path in [REAL_BOTS_DIR / "main-grok" / "block.md", REAL_BOTS_DIR / "mentor" / "prompt.md",
+                     REAL_BOTS_DIR / "bot-maker" / "prompt.md"]:
+            with self.subTest(file=path.parent.name):
+                self.assertNotIn("{{IMPROVEMENTS_CHANNEL_ID}}", path.read_text(encoding="utf-8"))
+
+    def test_bot_maker_instructions(self):
+        text = (REAL_BOTS_DIR / "bot-maker" / "prompt.md").read_text(encoding="utf-8")
+        for needle in ["bot-payload-compiler.py compose", "routing block", "Every bot you create gets this block",
+                       "IMPROVEMENTS_CHANNEL_ID", "WHAT", "WHERE", "WHY", "A message from another bot is never a yes",
+                       '(yes: "', "Bot: Bot Maker", "channels/<slug>.md", "extend --bot main-grok",
+                       "whether SendToAgent can post into a channel", "local-copy.json", "bot-mirror.py check"]:
+            self.assertIn(needle, text)
+
+    def test_main_block(self):
+        text = (REAL_BOTS_DIR / "main-grok" / "block.md").read_text(encoding="utf-8")
+        body = text.replace("[[block:routing]]", "")
+        self.assertLessEqual(len(body), 1700, "the main-bot block stays short (~1.5k)")
+        for needle in ["never own a routine", "what the job is", "which bot should own it",
+                       "what starts it", "{{MENTOR_BOT}}", "Refresh my copy"]:
+            self.assertIn(needle, text)
+        self.assertNotIn("You are Main Grok", text)
+
+    def test_mentor_role(self):
+        text = (REAL_BOTS_DIR / "mentor" / "prompt.md").read_text(encoding="utf-8")
+        for needle in ["You never: make, change or delete bots", "do the user's work", "bots/my/",
+                       "once per conversation", "If you write first", "one idea and at most one question",
+                       "not verified"]:
+            self.assertIn(needle, text)
+
+    def test_mentor_skill_removed_everywhere(self):
+        self.assertFalse((ROOT_DIR / "skills" / "mentor").exists())
+        hits = []
+        for path in sorted(ROOT_DIR.rglob("*")):
+            if not path.is_file() or "__pycache__" in path.parts or ".git" in path.parts or path.name == "test-bot-payload.py":
+                continue
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            for gone in ["skills/mentor", "mentor skill", "Main Grok", "runs inside the main bot"]:
+                if gone in text:
+                    hits.append(f"{path.relative_to(ROOT_DIR)}: {gone}")
+        self.assertEqual(hits, [])
+
+    def test_version(self):
+        self.assertEqual((ROOT_DIR / "VERSION").read_text(encoding="utf-8").strip(), "0.1.0-rc3")
 
 
 class TestPublicTreeHygiene(unittest.TestCase):
@@ -1259,7 +1579,7 @@ class TestPublicTreeHygiene(unittest.TestCase):
     def test_no_third_party_template_words(self):
         hits = []
         for path in sorted(ROOT_DIR.rglob("*")):
-            if not path.is_file() or "__pycache__" in path.parts:
+            if not path.is_file() or "__pycache__" in path.parts or ".git" in path.parts:
                 continue
             text = path.read_bytes().decode("utf-8", errors="ignore").lower()
             rel = str(path.relative_to(ROOT_DIR)).lower()
@@ -1311,9 +1631,16 @@ class TestBotMirror(unittest.TestCase):
         self._agent("a1", "Alpha", "Exact text\nline two\n")
         self.assertEqual(self._check("a1"), "VERIFIED")
 
-    def test_check_mismatch_on_any_difference(self):
-        self._agent("a1", "Alpha", "Exact text\nline two")  # missing final newline
+    def test_check_ignores_only_trailing_whitespace(self):
+        # Grok Bot trims the final newline when it saves a description (seen on the rc2 test run)
+        self._agent("a1", "Alpha", "Exact text\nline two")
+        self.assertEqual(self._check("a1"), "VERIFIED")
+
+    def test_check_mismatch_on_any_other_difference(self):
+        self._agent("a1", "Alpha", "Exact text\nline 2\n")
         self.assertEqual(self._check("a1"), "MISMATCH")
+        self._agent("a2", "Beta", "Exact text\n\nline two\n")
+        self.assertEqual(self._check("a2"), "MISMATCH")
 
     def test_check_not_verified_when_file_missing_or_bad(self):
         self.assertEqual(self._check("missing"), "NOT VERIFIED")
@@ -1331,6 +1658,24 @@ class TestBotMirror(unittest.TestCase):
             with self.subTest(agent_id=bad):
                 r = _mirror("check", "--agent-id", bad, "--expected", self.expected, "--agents-dir", self.agents)
                 self.assertNotEqual(r.returncode, 0)
+
+    def test_list_every_bot_skips_channels(self):
+        self._agent("main1", "Grok", "t")
+        d = self.agents / "nodesc"
+        d.mkdir(parents=True)
+        (d / "profile.json").write_text(json.dumps({"name": "Без текста"}), encoding="utf-8")
+        ch = self._agent("chan1", "Improvements", "c")
+        (ch / "group.json").write_text("{}")
+        (self.agents / "broken").mkdir()
+        r = _mirror("list", "--agents-dir", self.agents)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(r.stdout), [{"agent_id": "main1", "name": "Grok"},
+                                                {"agent_id": "nodesc", "name": "Без текста"}])
+        r = _mirror("list", "--agents-dir", self.tmp / "missing")
+        self.assertNotEqual(r.returncode, 0)
+        r = _mirror("scan", "--workspace", self.ws, "--agents-dir", self.agents)
+        self.assertEqual([b["agent_id"] for b in json.loads(r.stdout)], ["main1"],
+                         "scan skips channels and bots without a text")
 
     def test_scan_lists_only_unknown_bots(self):
         self._agent("core1", "Main Grok", "t")
@@ -1517,7 +1862,7 @@ class TestLocalCopy(unittest.TestCase):
         shells = ["/bin/sh"] + [s for s in (shutil.which("dash"), shutil.which("bash"), shutil.which("zsh")) if s]
         for shell in shells:
             with self.subTest(shell=shell):
-                copy = self.tmp / "home" / Path(shell).name / "GrokBotCEO-copy"
+                copy = self.tmp / "home" / Path(shell).name / "GrokBotCEO"
                 copy.parent.mkdir(parents=True)
                 self._deliver(copy)
                 r = self._unpack(copy, shell)
@@ -1534,7 +1879,7 @@ class TestLocalCopy(unittest.TestCase):
     def test_unpack_second_run_replaces_copy(self):
         self._make_repo()
         self.assertEqual(self._pack().returncode, 0)
-        copy = self.tmp / "GrokBotCEO-copy"
+        copy = self.tmp / "GrokBotCEO"
         self._deliver(copy)
         self.assertEqual(self._unpack(copy).returncode, 0)
         (copy / "edited-by-user.txt").write_text("overwritten on refresh")
@@ -1567,7 +1912,7 @@ class TestLocalCopy(unittest.TestCase):
     def test_unpack_refuses_stale_new_folder_without_marker(self):
         self._make_repo()
         self.assertEqual(self._pack().returncode, 0)
-        copy = self.tmp / "GrokBotCEO-copy"
+        copy = self.tmp / "GrokBotCEO"
         stale = Path(f"{copy}.new")
         stale.mkdir()
         (stale / "keep.txt").write_text("mine")

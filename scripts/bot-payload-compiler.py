@@ -9,12 +9,25 @@ Contract:
   error, so the two sources can never contradict each other.
 - Placeholders `{{KEY}}` are resolved from a fixed whitelist of keys (see KEY_DOCS),
   given by `--config config.json` and/or `--param KEY=value`.
+- Shared blocks: a line `[[block:<name>]]` in a text is replaced by bots/_blocks/<name>.md
+  before placeholders are resolved. One level only; an unknown block is an error.
+- Extension blocks: a folder with `block.md` and no profile.json (bots/main-grok/) is not a bot
+  of its own. Its text is appended to an existing bot's description (`extend`).
 
 Commands:
   create  PROFILE_JSON        print one CreateAgent payload
   update  --agent-id ID       print one UpdateAgent payload
   plan    PROFILE_JSON        print a human-readable plan (no payload, no side effects)
   build   --bots IDS --out DIR   write <id>.payload.json + <id>.md for each bot
+  extend  --bot ID --agent-id AID --out DIR
+                              read the current description of bot AID from its profile.json
+                              and write <id>.previous.md (as it was), <id>.md (old text,
+                              rstripped + blank line + the block) and <id>.payload.json
+                              (UpdateAgent: agent_id + description; the name is not touched)
+  compose --name NAME --text FILE --slug SLUG --out DIR
+                              a bot the user makes through Bot Maker: the user's text +
+                              blank line + the routing block; writes <slug>.md and
+                              <slug>.payload.json (CreateAgent: name + description)
   config-example --out-dir DIR   write config.example.json + config.schema.md
 """
 import argparse
@@ -28,6 +41,13 @@ from typing import Dict, Any, List, Optional, Tuple
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_BOTS_DIR = SCRIPT_DIR.parent / "bots"
+DEFAULT_AGENTS_DIR = Path.home() / "agent-data" / "agents"
+BLOCKS_DIRNAME = "_blocks"
+INCLUDE_RE = re.compile(r'\[\[block:([^\]]*)\]\]')
+BLOCK_NAME_RE = re.compile(r'^[a-z0-9][a-z0-9-]*$')
+AGENT_ID_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]*$')
+# The standard routing block (lasting changes -> the Improvements channel -> Bot Maker).
+ROUTING_BLOCK = "routing"
 
 # Supported CreateAgent arguments (whitelist)
 CREATE_AGENT_WHITELIST = {"name", "description", "section_id"}
@@ -58,7 +78,8 @@ KEY_DOCS: Dict[str, Tuple[str, str]] = {
     "HOUR": ("Cron hour field used in routine schedules", "9"),
     "IMPLEMENTER_BOT": ("Name of your Implementer bot (SendToAgent target)", "Implementer"),
     "IMPROVEMENTS_CHANNEL": ("Channel where bot changes are proposed and approved by the owner", "#improvements"),
-    "IMPROVEMENTS_CHANNEL_ID": ("ID of the improvements channel", "channel-0000-example"),
+    "IMPROVEMENTS_CHANNEL_ID": ("ID of the Improvements channel; written by the installer after it creates the channel", "channel-0000-example"),
+    "MENTOR_BOT": ("Name of your Mentor bot as shown in the sidebar (may be in your language)", "Mentor"),
     "MINUTE": ("Cron minute field used in routine schedules", "0"),
     "MONITOR_DATA_PATH": ("Folder where Monitor saves weekly report data", "/home/bot/grokbot/data/monitor"),
     "NOTION_PROJECT_DATABASE": ("Notion database that Projects Manager reads", "https://www.notion.so/example-workspace/0000000000000000"),
@@ -88,9 +109,15 @@ KEY_DOCS: Dict[str, Tuple[str, str]] = {
 # Strict allowed placeholder keys (whitelist for all bots)
 ALLOWED_PLACEHOLDER_KEYS = frozenset(KEY_DOCS)
 
-# Bots the installer creates in this release (stage 1 of the roadmap). Keys used by these bots
-# are the only ones asked at install; every other key belongs to optional bots.
-STAGE1_BOTS = ("main-grok", "bot-maker")
+# Bots the installer creates in this release (stage 1 of the roadmap), and the block it adds to
+# the user's own main bot. Keys used by these are the only ones asked at install; every other
+# key belongs to optional bots.
+STAGE1_BOTS = ("bot-maker", "mentor")
+STAGE1_EXTENDED = ("main-grok",)
+
+# Keys that stage-1 bots read from config.json at run time instead of having them baked in at
+# build time (the channel is created after the bots, so its id cannot be in their texts).
+RUNTIME_KEYS = {"IMPROVEMENTS_CHANNEL_ID"}
 
 
 class CompileError(ValueError):
@@ -144,11 +171,46 @@ def load_persona(bot_dir: Path) -> str:
     return text
 
 
+def blocks_dir_for(bot_dir: Path) -> Path:
+    return bot_dir.parent / BLOCKS_DIRNAME
+
+
+def load_block(blocks_dir: Path, name: str) -> str:
+    if not BLOCK_NAME_RE.match(name):
+        raise CompileError(f"Invalid block name [[block:{name}]] (expected lowercase letters, digits, '-')")
+    path = blocks_dir / f"{name}.md"
+    try:
+        text = path.read_text(encoding='utf-8')
+    except IOError:
+        raise CompileError(f"Unknown block [[block:{name}]]: {path} not found")
+    if not text.strip():
+        raise CompileError(f"Block {path} is empty")
+    if INCLUDE_RE.search(text):
+        raise CompileError(f"Block {path} includes another block (one level only)")
+    return text.strip()
+
+
+def expand_blocks(text: str, blocks_dir: Path) -> str:
+    """Replace every [[block:<name>]] with bots/_blocks/<name>.md (stripped). One level only."""
+    return INCLUDE_RE.sub(lambda m: load_block(blocks_dir, m.group(1)), text)
+
+
 def load_bot(profile_path: Path) -> Tuple[Dict[str, Any], str]:
-    """Load (profile, persona) for the bot whose profile.json is given."""
+    """Load (profile, persona) for the bot whose profile.json is given; blocks are expanded."""
     profile = load_profile(profile_path)
-    persona = load_persona(profile_path.parent)
+    persona = expand_blocks(load_persona(profile_path.parent), blocks_dir_for(profile_path.parent))
     return profile, persona
+
+
+def load_extension_block(bot_dir: Path) -> str:
+    """Load block.md of an extension folder (e.g. bots/main-grok/); blocks are expanded."""
+    path = bot_dir / "block.md"
+    if not path.exists():
+        raise CompileError(f"Missing extension block {path} (block.md)")
+    text = path.read_text(encoding='utf-8')
+    if not text.strip():
+        raise CompileError(f"block.md is empty at {path}")
+    return expand_blocks(text, blocks_dir_for(bot_dir))
 
 
 def validate_params(params: Dict[str, str], source: str = "parameters") -> None:
@@ -280,7 +342,9 @@ def compile_create_payload(
     params = params or {}
     try:
         name = resolve_placeholders(profile["name"], params)
-        description = resolve_placeholders(persona, params)
+        # Grok Bot trims trailing whitespace when it saves a description (verified on a test
+        # account, rc2). Send the trimmed text so that what is sent equals what is stored.
+        description = resolve_placeholders(persona, params).rstrip()
     except ValueError as e:
         raise CompileError(f"Placeholder resolution failed: {e}")
 
@@ -318,7 +382,7 @@ def compile_update_payload(
 
     if description is not None:
         try:
-            resolved_desc = resolve_placeholders(description, params)
+            resolved_desc = resolve_placeholders(description, params).rstrip()  # see compile_create_payload
             if not resolved_desc.strip():
                 raise CompileError("Description cannot be empty")
             payload["description"] = resolved_desc
@@ -373,7 +437,16 @@ def payload_json(payload: Dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------
 
 def list_bot_ids(bots_dir: Path) -> List[str]:
-    return sorted(d.name for d in bots_dir.iterdir() if d.is_dir() and (d / "profile.json").exists())
+    """Bots created with CreateAgent: folders with profile.json."""
+    return sorted(d.name for d in bots_dir.iterdir()
+                  if d.is_dir() and not d.name.startswith("_") and (d / "profile.json").exists())
+
+
+def list_extension_ids(bots_dir: Path) -> List[str]:
+    """Extension blocks appended to an existing bot: folders with block.md and no profile.json."""
+    return sorted(d.name for d in bots_dir.iterdir()
+                  if d.is_dir() and not d.name.startswith("_") and (d / "block.md").exists()
+                  and not (d / "profile.json").exists())
 
 
 def parse_bot_ids(spec: str, bots_dir: Path) -> List[str]:
@@ -447,6 +520,115 @@ def build(bots_dir: Path, bot_ids: List[str], params: Dict[str, str], out_dir: P
 
 
 # ---------------------------------------------------------------------------
+# extend: append an extension block to an existing bot (the user's own main bot)
+# ---------------------------------------------------------------------------
+
+def read_current_description(agents_dir: Path, agent_id: str) -> str:
+    """The description of an existing bot, from <agents-dir>/<agent_id>/profile.json."""
+    if not isinstance(agent_id, str) or not AGENT_ID_RE.match(agent_id):
+        raise CompileError(f"invalid agent id: {agent_id!r}")
+    path = agents_dir / agent_id / "profile.json"
+    try:
+        data = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError) as e:
+        raise CompileError(f"cannot read the current text of bot {agent_id} ({path}): {e}. "
+                           f"Without it the bot is not extended (its text would be lost).")
+    if not isinstance(data, dict):
+        raise CompileError(f"{path} is not a JSON object")
+    description = data.get("description", "")
+    if description is None:
+        description = ""
+    if not isinstance(description, str):
+        raise CompileError(f"{path}: description is not a string")
+    return description
+
+
+def combine_text(current: str, block: str) -> str:
+    """Old text (trailing whitespace trimmed) + blank line + block (trimmed)."""
+    current = current.rstrip()
+    block = block.strip()
+    return f"{current}\n\n{block}" if current else block
+
+
+def compile_extend(bots_dir: Path, ext_id: str, agent_id: str, current: str,
+                   params: Dict[str, str]) -> Dict[str, Any]:
+    """Return {"previous", "text", "payload"} for appending bots/<ext_id>/block.md to a bot."""
+    if ext_id not in list_extension_ids(bots_dir):
+        raise CompileError(f"{ext_id}: not an extension block (bots/{ext_id}/block.md)")
+    block = resolve_placeholders(load_extension_block(bots_dir / ext_id), params).strip()
+    if block in current:
+        raise CompileError(f"bot {agent_id} already contains the {ext_id} block; nothing to add")
+    text = combine_text(current, block)
+    payload = {"agent_id": agent_id, "description": text}
+    leaked = set(payload) - UPDATE_AGENT_WHITELIST
+    if leaked:
+        raise CompileError(f"Payload contains non-whitelisted keys: {leaked}")
+    return {"previous": current, "text": text, "payload": payload}
+
+
+def extend(bots_dir: Path, ext_id: str, agent_id: str, params: Dict[str, str], out_dir: Path,
+           agents_dir: Path) -> List[Path]:
+    current = read_current_description(agents_dir, agent_id)
+    result = compile_extend(bots_dir, ext_id, agent_id, current, params)
+    if out_dir.exists() and not out_dir.is_dir():
+        raise CompileError(f"--out is not a directory: {out_dir}")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    paths = [out_dir / f"{ext_id}.previous.md", out_dir / f"{ext_id}.md", out_dir / f"{ext_id}.payload.json"]
+    _atomic_write(paths[0], result["previous"])        # exactly as it was, for rollback
+    _atomic_write(paths[1], result["text"])            # exact text sent as description
+    _atomic_write(paths[2], payload_json(result["payload"]))
+    return paths
+
+
+# ---------------------------------------------------------------------------
+# compose: a bot the user makes through Bot Maker gets the routing block
+# ---------------------------------------------------------------------------
+
+SLUG_RE = re.compile(r'^[^\W_](?:[\w-]*[^\W_])?$', re.UNICODE)
+
+
+def routing_block(bots_dir: Path, params: Dict[str, str]) -> str:
+    return resolve_placeholders(load_block(bots_dir / BLOCKS_DIRNAME, ROUTING_BLOCK), params).strip()
+
+
+def compile_compose(bots_dir: Path, name: str, text: str, params: Dict[str, str]) -> Dict[str, Any]:
+    """CreateAgent payload for a user's bot: the user's text + blank line + the routing block.
+
+    The user's text is taken as is (no placeholders are resolved in it). If it already holds the
+    routing block (a change to a bot made earlier), the block is not added twice.
+    """
+    if not isinstance(name, str) or not name.strip():
+        raise CompileError("--name is empty")
+    if not text.strip():
+        raise CompileError("the bot text is empty")
+    block = routing_block(bots_dir, params)
+    description = text.rstrip() if block in text else combine_text(text, block)
+    payload = {"name": name.strip(), "description": description}
+    leaked = set(payload) - CREATE_AGENT_WHITELIST
+    if leaked:
+        raise CompileError(f"Payload contains non-whitelisted keys: {leaked}")
+    return payload
+
+
+def compose(bots_dir: Path, name: str, text_file: Path, slug: str, params: Dict[str, str],
+            out_dir: Path) -> List[Path]:
+    if not isinstance(slug, str) or not SLUG_RE.match(slug):
+        raise CompileError(f"invalid --slug {slug!r} (letters, digits and '-')")
+    try:
+        text = text_file.read_text(encoding='utf-8')
+    except OSError as e:
+        raise CompileError(f"cannot read --text {text_file}: {e}")
+    payload = compile_compose(bots_dir, name, text, params)
+    if out_dir.exists() and not out_dir.is_dir():
+        raise CompileError(f"--out is not a directory: {out_dir}")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    md_path, json_path = out_dir / f"{slug}.md", out_dir / f"{slug}.payload.json"
+    _atomic_write(md_path, payload["description"])
+    _atomic_write(json_path, payload_json(payload))
+    return [md_path, json_path]
+
+
+# ---------------------------------------------------------------------------
 # config-example: config.example.json + config.schema.md, computed from the files
 # ---------------------------------------------------------------------------
 
@@ -457,12 +639,14 @@ def placeholder_usage(bots_dir: Path) -> Dict[str, List[str]]:
     """
     usage: Dict[str, set] = {k: set() for k in ALLOWED_PLACEHOLDER_KEYS}
     unknown: List[str] = []
-    for bot_id in list_bot_ids(bots_dir):
+    blocks_dir = bots_dir / BLOCKS_DIRNAME
+    for bot_id in list_bot_ids(bots_dir) + list_extension_ids(bots_dir):
         bot_dir = bots_dir / bot_id
         sources = []
-        prompt = bot_dir / "prompt.md"
-        if prompt.exists():
-            sources.append(("prompt.md", prompt.read_text(encoding='utf-8')))
+        for fname in ("prompt.md", "block.md"):
+            path = bot_dir / fname
+            if path.exists():
+                sources.append((fname, expand_blocks(path.read_text(encoding='utf-8'), blocks_dir)))
         try:
             with open(bot_dir / "profile.json", encoding='utf-8') as f:
                 name = json.load(f).get("name", "")
@@ -480,10 +664,13 @@ def placeholder_usage(bots_dir: Path) -> Dict[str, List[str]]:
     return {k: sorted(v) for k, v in usage.items()}
 
 
+STAGE1_ALL = STAGE1_BOTS + STAGE1_EXTENDED
+
+
 def stage1_keys(bots_dir: Path) -> List[str]:
-    """Keys used by the bots this release installs (STAGE1_BOTS)."""
+    """Keys baked into the texts this release installs (STAGE1_BOTS + STAGE1_EXTENDED)."""
     usage = placeholder_usage(bots_dir)
-    return sorted(k for k, bots in usage.items() if set(bots) & set(STAGE1_BOTS))
+    return sorted(k for k, bots in usage.items() if set(bots) & set(STAGE1_ALL))
 
 
 def render_config_example() -> str:
@@ -501,13 +688,17 @@ def render_config_schema(usage: Dict[str, List[str]]) -> str:
         "accepted; any other key is rejected. Values must be non-empty strings without `{{` or `}}`.",
         "",
         "\"Required\" means: the build fails if the key is missing and you build at least one bot listed",
-        "in \"Used by\". \"Used by\" is computed from the compiled sources (`bots/*/prompt.md` and the",
-        "`name` in `bots/*/profile.json`).",
+        "in \"Used by\". \"Used by\" is computed from the compiled sources (`bots/*/prompt.md`,",
+        "`bots/*/block.md`, the shared blocks they include from `bots/_blocks/`, and the `name` in",
+        "`bots/*/profile.json`).",
         "",
-        "\"Stage 1\": this release installs only " + ", ".join(STAGE1_BOTS) + ". Keys marked **stage 1**",
-        "are used by these bots and are the only ones the installer writes to `config.json`. All other",
-        "keys are used by optional bots that this release does not install; `config.example.json`",
-        "keeps them so those bots still build.",
+        "\"Stage 1\": this release creates only " + ", ".join(STAGE1_BOTS) + " and adds "
+        + ", ".join(f"`bots/{e}/block.md`" for e in STAGE1_EXTENDED) + " to the user's own",
+        "main bot. Keys marked **stage 1** are used by these texts and are the only ones the installer",
+        "writes to `config.json`. **stage 1 (runtime)**: the installer writes the key later (after it",
+        "creates the channel) and stage-1 bots read it from `config.json` when they need it; it is",
+        "never baked into their texts. All other keys are used by optional bots that this release",
+        "does not install; `config.example.json` keeps them so those bots still build.",
         "",
         "| Key | Meaning | Stage | Required? | Used by | Example (fictional) |",
         "|---|---|---|---|---|---|",
@@ -517,7 +708,12 @@ def render_config_schema(usage: Dict[str, List[str]]) -> str:
         bots = usage.get(key, [])
         required = "yes" if bots else "no (unused)"
         used_by = ", ".join(bots) if bots else "-"
-        stage = "**stage 1**" if set(bots) & set(STAGE1_BOTS) else "optional bots"
+        if set(bots) & set(STAGE1_ALL):
+            stage = "**stage 1**"
+        elif key in RUNTIME_KEYS:
+            stage = "**stage 1 (runtime)**"
+        else:
+            stage = "optional bots"
         lines.append(f"| `{key}` | {meaning} | {stage} | {required} | {used_by} | `{example}` |")
     lines.append("")
     return "\n".join(lines)
@@ -539,17 +735,22 @@ def write_config_example(out_dir: Path, bots_dir: Path) -> List[Path]:
 
 def main():
     parser = argparse.ArgumentParser(description='Compile bot payloads for CreateAgent/UpdateAgent')
-    parser.add_argument('command', choices=['create', 'update', 'plan', 'build', 'config-example'])
+    parser.add_argument('command', choices=['create', 'update', 'plan', 'build', 'extend', 'compose', 'config-example'])
     parser.add_argument('profile_json', nargs='?', type=Path, help='Path to profile.json (for create/plan)')
     parser.add_argument('--agent-id', help='Agent ID (for update)')
-    parser.add_argument('--name', help='New name (for update)')
+    parser.add_argument('--name', help='New name (for update) or the bot name (for compose)')
+    parser.add_argument('--bot', help='Extension block id, e.g. main-grok (for extend)')
+    parser.add_argument('--text', type=Path, help="File with the user's bot text (for compose)")
+    parser.add_argument('--slug', help='File name stem for the output (for compose)')
+    parser.add_argument('--agents-dir', type=Path, default=DEFAULT_AGENTS_DIR,
+                        help='Folder of bot folders on the bot computer (for extend; default ~/agent-data/agents)')
     parser.add_argument('--description', help='New description (for update)')
     parser.add_argument('--section-id', help='Section ID (for create/build)')
     parser.add_argument('--config', type=Path, help='Flat JSON config {KEY: value} (same whitelist as --param)')
     parser.add_argument('--param', action='append', help='Placeholder param KEY=value (repeatable, overrides --config)')
     parser.add_argument('--bots', help="Comma-separated bot ids, or 'all' (for build)")
     parser.add_argument('--bots-dir', type=Path, default=DEFAULT_BOTS_DIR, help='Bot templates folder (default: ../bots)')
-    parser.add_argument('--out', type=Path, help='Output folder (for build)')
+    parser.add_argument('--out', type=Path, help='Output folder (for build, extend, compose)')
     parser.add_argument('--out-dir', type=Path, help='Output folder (for config-example)')
     parser.add_argument('--output', '-o', type=Path, help='Output JSON file (create/update/plan; default: stdout)')
 
@@ -575,6 +776,20 @@ def main():
             for path in written:
                 print(path)
             print(f"Built {len(written) // 2} bot payload(s) into {args.out}", file=sys.stderr)
+            return 0
+
+        if args.command == 'extend':
+            if not args.bot or not args.agent_id or not args.out:
+                raise CompileError("extend needs --bot, --agent-id and --out")
+            for path in extend(args.bots_dir, args.bot, args.agent_id, params, args.out, args.agents_dir):
+                print(path)
+            return 0
+
+        if args.command == 'compose':
+            if not args.name or not args.text or not args.slug or not args.out:
+                raise CompileError("compose needs --name, --text, --slug and --out")
+            for path in compose(args.bots_dir, args.name, args.text, args.slug, params, args.out):
+                print(path)
             return 0
 
         if args.command == 'create':

@@ -1,26 +1,38 @@
 # Loading Instructions — installation recipe for the bot
 
 **Reader:** the Grok Bot that the user asked to install GrokBotCEO (see [ONBOARDING.md](ONBOARDING.md)).
-Follow the steps in order. Do not add steps. Talk to the user in their language.
+Follow the steps in order. Do not add steps. Talk to the user in their language, in beginner's
+words: one idea and at most one question per message; no technical words (git, repo, commit,
+GitHub, config.json, paths, payload) unless the user asks.
 
-This release installs stage 1 only: **Main Grok** (with the mentor skill) and **Bot Maker**, plus a
-git repo in the workspace that mirrors the user's system. No routines are set up.
+This release installs stage 1 only, the core:
+
+- **the user's main bot is extended, not replaced.** You do not create a new main bot. You add
+  the GrokBotCEO block to the user's main bot (normally you, the bot running this install) with
+  `UpdateAgent`. Its name stays;
+- **Bot Maker** and **Mentor** are created;
+- the **Improvements channel** is created (the user, the main bot, Bot Maker);
+- a git repo in the workspace mirrors the user's system. No routines are set up.
 
 ## Contract
 
 ```
-fetch → capability check → mentor explains → config.json → plan (2 bots) → user "yes"
-      → build (script) → CreateAgent per bot → write check → bots/core/ + VERSION
-      → git commit → offer a copy on the user's computer → mentor tour
+fetch → capability check → find the main bot → explain → config.json → plan → user "yes"
+      → build (script) → create Bot Maker, Mentor → write checks
+      → create the Improvements channel → extend the main bot → write check
+      → bots/core/, channels/, VERSION → first commit → offer a copy on the user's computer
+      → final message: hand the user to Mentor
 ```
 
-**Stop only at:** already installed (step 1), missing capability (step 2), user says no (step 5),
-build error (step 6), CreateAgent error (step 7). A write check that cannot be done is **not** a
-stop: mark the bot `NOT VERIFIED` and continue.
+**Stop only at:** already installed (step 1), missing capability (step 2), user says no (step 6),
+build error (step 7), CreateAgent error (step 8). These are **not** stops: a write check that
+cannot be done (mark it `NOT VERIFIED`), a failed channel (step 9), a failed extension of the main
+bot (step 10). Tell the user in one line and continue.
 
-**Never:** ask for secrets in chat; create a bot not in the approved plan; create or turn on a
-routine; send a message on the user's behalf; write inside `grokbotceo/` (the release copy); send
-`config.json` anywhere other than the user's own computer (step 10); add a git remote or push.
+**Never:** ask for secrets in chat; create a bot not in the approved plan; create a second main
+bot; create or turn on a routine; send a message on the user's behalf; write inside `grokbotceo/`
+(the release copy); send `config.json` anywhere other than the user's own computer (step 13); add
+a git remote or push.
 
 ## Layout in the user's workspace
 
@@ -31,14 +43,18 @@ routine; send a message on the user's behalf; write inside `grokbotceo/` (the re
   config.json              user values {KEY: value}; never overwritten by an update
   local-copy.json          optional: {"path": ...} of the read-only copy on the user's computer
   VERSION                  installed GrokBotCEO version
-  bots/core/<bot>/         our bots as installed: prompt.md, agent.json
+  bots/core/main-grok/     the user's main bot: prompt.md, previous.md, agent.json
+  bots/core/<bot>/         bot-maker, mentor as installed: prompt.md, agent.json
   bots/my/<bot>/           bots the user makes through Bot Maker
   bots/marketplace/<bot>/  copies of imported bots (name and text only)
+  channels/<slug>.md       one file per channel: name, id, members, purpose
   build/                   compiled payloads; safe to delete; not committed
 ```
 
-`bots/core/<bot>/prompt.md` is the exact `description` sent. `agent.json` is
-`{"agent_id": "...", "check": "VERIFIED|NOT VERIFIED|MISMATCH", "version": "<VERSION>", "edited": false}`.
+`bots/core/<bot>/prompt.md` is always the exact text the bot runs on. `agent.json` is
+`{"agent_id": "...", "check": "VERIFIED|NOT VERIFIED|MISMATCH", "version": "<VERSION>", "edited": false}`;
+for `main-grok` it also has `"mode": "extended"`, and `"check"` may be `NOT APPLIED` (step 10).
+`bots/core/main-grok/previous.md` is the main bot's text before the install, kept for rollback.
 
 ## 1. Fetch the release
 
@@ -55,61 +71,106 @@ Check with GetDynamicTools and one harmless shell command that you have:
 
 | Capability | Needed for | If missing |
 |---|---|---|
-| `CreateAgent` (`name`, `description`, `section_id`) | creating bots | **stop**, tell the user |
+| `CreateAgent` (`name`, `description`, `section_id`) | creating Bot Maker and Mentor | **stop**, tell the user |
 | reading and writing files in the workspace | config, build, repo | **stop**, tell the user |
 | running `python3` | build script, write check | **stop**, tell the user |
 | running `git` | the repo mirror | **stop**, tell the user |
+| `UpdateAgent` (`agent_id`, `description`) | extending the main bot (step 10) | optional: the main bot is not extended; say so in the plan |
+| `CreateChannel` | the Improvements channel (step 9) | optional: no channel; bots then send change requests straight to Bot Maker |
+| `SendToAgent` | bots passing change requests on | optional: bots then tell the user what to say to Bot Maker |
 | `ListSections` | placing bots in a section | optional: create without section |
-| running commands on the user's computer and copying files to it (`CopyFromBox`), through the Grok Bot desktop app | the optional copy (step 10) | optional: do not offer the copy; say it needs the desktop app |
+| running commands on the user's computer and copying files to it (`CopyFromBox`), through the Grok Bot desktop app | the optional copy (step 13) | optional: do not offer the copy; say it needs the desktop app |
 
-Only look for these last tools in the list; do not run them in this step.
+Only look for these tools in the list; do not run them in this step. Note the argument names that
+GetDynamicTools shows for `CreateChannel`; you need them in step 9.
 
 Report the result in one short list. Do not look for workarounds.
 
-## 3. Mentor explains
+## 3. Find the main bot
 
-Read `grokbotceo/skills/mentor/SKILL.md`. Explain in 3–5 sentences what will be installed: two
-bots, a repo that mirrors the system, nothing created before the user's "yes".
+The user already has a main bot: the default Grok Bot they talk to, normally you. Find its
+`agent_id` before creating anything:
 
-## 4. Write config.json
+```bash
+python3 <WORKSPACE_PATH>/grokbotceo/scripts/bot-mirror.py list
+```
+
+It prints every bot on the bot computer as `{agent_id, name}`, read from
+`~/agent-data/agents/*/profile.json`.
+
+- **One bot:** that is the main bot.
+- **More than one:** list their names and ask one question: "Which of these is your main bot, the
+  one you talk to every day?" Use the bot the user names.
+- **None, or the command fails:** say in one line that the main bot could not be found; it will
+  not be extended (step 10 is skipped, Bot Maker can do it later). Continue.
+
+Remember its `agent_id` and name for steps 6 and 10.
+
+## 4. Explain
+
+In 3–5 short sentences, in plain words: what will be added (the main bot learns GrokBotCEO and
+keeps its name; two new bots, Bot Maker and Mentor; a channel called Improvements where changes are
+agreed; a record of all bots with the history of every change, kept on the bot computer), and that
+nothing is created or changed before the user's "yes".
+
+## 5. Write config.json
 
 Stage 1 uses only the keys marked **stage 1** in `grokbotceo/config.schema.md`:
 
 - `WORKSPACE_PATH` — the absolute path of this workspace. Fill it in yourself.
 - `BOT_MAKER_BOT` — `Bot Maker`, the name in `grokbotceo/bots/bot-maker/profile.json`. Do not ask.
+- `MENTOR_BOT` — `Mentor`, or the same word in the user's language (for example `Ментор`). It is
+  the name the user sees in the sidebar. Do not ask.
 
-Write them to `<WORKSPACE_PATH>/config.json` as a flat JSON object `{KEY: value}`. Show the user the
-file in one message and let them correct the path. Ask nothing else.
+`IMPROVEMENTS_CHANNEL_ID` (**stage 1 (runtime)**) is added in step 9, after the channel exists.
+Bots read it from `config.json` when they need it; it is never built into their texts.
 
-## 5. Plan and approval
+Write the keys to `<WORKSPACE_PATH>/config.json` as a flat JSON object `{KEY: value}`. Tell the user
+in one sentence which folder you work in and let them correct it. Ask nothing else.
 
-Show the plan:
+## 6. Plan and approval
 
-- exactly two bots, in this order: `main-grok`, `bot-maker`; for each: name, one line about its
-  job, length of its text;
-- the repo: `<WORKSPACE_PATH>` becomes a git repo with `bots/core/`, `bots/my/`, `bots/marketplace/`;
-  no remote, nothing leaves the bot computer. A copy on the user's own computer is offered
-  separately, after install (step 10).
+Show the plan, one short line each, in this order:
 
-Ask: "Create these two bots and the repo? Reply yes." Create nothing before an explicit yes. Other
-bots in `grokbotceo/bots/` are not offered in this release.
+1. "I will add GrokBotCEO to me (your main bot); my name stays." If the main bot is another bot
+   (step 3), name it: "I will add GrokBotCEO to <name> (your main bot); its name stays." If it
+   could not be found, or `UpdateAgent` is missing, say instead that this part is skipped for now.
+2. Create **Bot Maker**: makes and changes your bots.
+3. Create **Mentor** (the name from `MENTOR_BOT`): shows you around and answers how things work.
+4. Create a channel called **Improvements**: you, your main bot and Bot Maker; this is where
+   changes are agreed. (Skip the line if `CreateChannel` is missing.)
+5. A record of your bots with the history of every change, kept here on the bot computer; nothing
+   leaves it.
+6. Afterwards I will ask if you want a copy on your own computer.
 
-## 6. Build (script, no model work)
+Ask: "Shall I do this? Reply yes." Create and change nothing before an explicit yes. Other bots in
+`grokbotceo/bots/` are not offered in this release.
+
+## 7. Build (script, no model work)
 
 ```bash
 cd <WORKSPACE_PATH>
 python3 grokbotceo/scripts/bot-payload-compiler.py build \
-  --config config.json --bots main-grok,bot-maker --out build/
+  --config config.json --bots bot-maker,mentor --out build/
+python3 grokbotceo/scripts/bot-payload-compiler.py extend \
+  --bot main-grok --agent-id <main bot agent_id> --config config.json --out build/
 ```
 
-The script writes `build/<bot>.payload.json` (only `name`, `description`, optional `section_id`)
-and `build/<bot>.md` (the exact `description`). It fails the whole build on an unknown key or an
+`build` writes `build/<bot>.payload.json` (only `name`, `description`, optional `section_id`) and
+`build/<bot>.md` (the exact `description`). It fails the whole build on an unknown key or an
 unfilled `{{KEY}}`, before writing anything. On failure: show the error, fix `config.json` with
 the user, rebuild. Do not edit texts by hand.
 
-## 7. Create the bots
+`extend` reads the main bot's current text from its `profile.json` and writes
+`build/main-grok.previous.md` (the text as it is now), `build/main-grok.md` (that text without
+trailing whitespace, a blank line, then the main-bot block) and `build/main-grok.payload.json`
+(`agent_id` and `description`; no name, so the name stays). If `extend` fails (the text cannot be
+read, or the block is already there), the main bot is not extended: one line to the user, continue.
+Skip `extend` if step 3 found no main bot.
 
-For each bot, in plan order:
+## 8. Create Bot Maker and Mentor
+
+For each bot, in this order: `bot-maker`, `mentor`:
 
 1. Call `CreateAgent` with exactly the fields of `build/<bot>.payload.json`. Pass the text as is.
 2. Record the returned `agent_id`.
@@ -121,64 +182,118 @@ For each bot, in plan order:
    ```
 
    It reads `~/agent-data/agents/<agent_id>/profile.json` (every bot has a folder there, in the home
-   folder of the bot computer) and prints `VERIFIED` (equal), `MISMATCH` (different) or
-   `NOT VERIFIED` (file missing or unreadable). None of them stops the install.
+   folder of the bot computer) and prints `VERIFIED` (equal; trailing whitespace is ignored),
+   `MISMATCH` (different) or `NOT VERIFIED` (file missing or unreadable). None of them stops the
+   install.
 4. Print one line: `<bot> · created · <VERIFIED|NOT VERIFIED|MISMATCH>`.
 
-If `CreateAgent` returns an error: stop creating, keep what was created, go to step 8 with the
+Mentor may write the first message in its own chat right after it is created; that is fine.
+
+If `CreateAgent` returns an error: stop creating, keep what was created, go to step 11 with the
 bots created so far and tell the user which bot failed and the error text.
 
-## 8. Save what was installed
+## 9. Create the Improvements channel
 
-For every created bot:
+Call `CreateChannel` with the name `Improvements` (or the same word in the user's language) and
+the members: the user, the main bot (step 3) and Bot Maker (step 8). Use the argument names that
+GetDynamicTools showed; they are not verified in this release.
 
-- `bots/core/<bot>/prompt.md` ← copy of `build/<bot>.md`;
-- `bots/core/<bot>/agent.json` ← `{"agent_id", "check", "version", "edited": false}`.
+- **It worked:** add `"IMPROVEMENTS_CHANNEL_ID": "<the returned id>"` to `config.json` and write
+  `channels/improvements.md`:
+
+  ```
+  # <channel name>
+
+  - id: <channel id>
+  - members: the user, <main bot name>, Bot Maker
+  - purpose: requests to change something for good; Bot Maker clarifies them here, shows each
+    change as WHAT / WHERE / WHY and changes nothing before the user's own yes
+  - created by: <your bot name>, at install
+  ```
+
+  Print one line: `Improvements · created`.
+- **It failed:** one line to the user ("I could not create the Improvements channel; your bots
+  will send change requests straight to Bot Maker"). Write no channel id. Continue.
+
+## 10. Extend the main bot
+
+Skip this step if there is no `build/main-grok.payload.json` (step 7).
+
+1. Call `UpdateAgent` with exactly the fields of `build/main-grok.payload.json`.
+2. **Write check** against the combined text:
+
+   ```bash
+   python3 grokbotceo/scripts/bot-mirror.py check --agent-id <main bot agent_id> --expected build/main-grok.md
+   ```
+
+3. Print one line: `main bot · extended · <VERIFIED|NOT VERIFIED|MISMATCH>`.
+
+Whether a bot can `UpdateAgent` itself is **not verified**. If the call fails: one line to the
+user ("I could not add GrokBotCEO to your main bot; Bot Maker can do it later: tell it
+'add GrokBotCEO to my main bot'"), record `"check": "NOT APPLIED"` in step 11, continue.
+
+## 11. Save what was installed
+
+- `bots/core/bot-maker/`, `bots/core/mentor/` (each bot created in step 8): `prompt.md` ← copy of
+  `build/<bot>.md`; `agent.json` ← `{"agent_id", "check", "version", "edited": false}`.
+- `bots/core/main-grok/` (if step 3 found the main bot):
+  - `previous.md` ← copy of `build/main-grok.previous.md`;
+  - `prompt.md` ← the text the bot runs on now: `build/main-grok.md` if step 10 worked, otherwise
+    the same text as `previous.md`;
+  - if `extend` failed (no `build/main-grok.previous.md`), write neither file: only `agent.json`;
+  - `agent.json` ← `{"agent_id", "check", "version", "edited": false, "mode": "extended"}`, with
+    `"check": "NOT APPLIED"` if step 10 was skipped or failed.
 
 Then `VERSION` ← contents of `grokbotceo/VERSION`, and `.gitignore` ← the two lines `grokbotceo/`
-and `build/`. Create empty `bots/my/` and `bots/marketplace/` with a `.gitkeep` each.
+and `build/`. Create empty `bots/my/` and `bots/marketplace/` with a `.gitkeep` each, and
+`channels/` with a `.gitkeep` if step 9 failed.
 
-These files let a later update find which bots the user changed. Do not skip this step.
+These files let a later update find which bots the user changed, and let the user roll the main
+bot back. Do not skip this step.
 
-## 9. First commit
+## 12. First commit
 
 ```bash
 cd <WORKSPACE_PATH>
 [ -d .git ] || git init
 git config user.name "GrokBotCEO bots"
 git config user.email "grokbotceo@localhost"
-git add .gitignore config.json VERSION bots/
-git commit -m "Install GrokBotCEO <VERSION>" -m "Bot: <your bot name>"
+git add .gitignore config.json VERSION bots/ channels/
+git commit -m "Install GrokBotCEO <VERSION> (yes: \"<the user's exact yes words>\")" -m "Bot: <your bot name>"
 ```
 
-The identity is set for this repo only. Add only these paths, never everything. Every later commit in this repo ends with a line
-`Bot: <name of the bot that made it>`. No remote is added. A copy on GitHub is optional and
-later; mention it, do not set it up. A copy on the user's own computer is offered in step 10.
+The identity is set for this repo only. Add only these paths, never everything. Every later commit
+in this repo ends with a line `Bot: <name of the bot that made it>`. No remote is added. A copy on
+GitHub is optional and later; do not set it up. A copy on the user's own computer is offered in
+step 13.
 
-## 10. Offer a copy on the user's computer
+## 13. Offer a copy on the user's computer
 
-Ask one question: "Do you want a read-only copy of this repo on your own computer (Mac or Linux)?
-It is refreshed after every change. Reply yes or no." Neither answer is a stop.
+Ask one question: "Do you want a read-only copy of your bots and their history on your own
+computer (Mac or Linux)? It is refreshed after every change. Reply yes or no." Neither answer is a
+stop.
 
 - **Yes:** follow `grokbotceo/LOCAL-COPY.md` ([LOCAL-COPY.md](LOCAL-COPY.md)): warn about the
-  permission question, find the home folder, agree on the path, write
+  permission question, find the home folder, agree on the folder, write
   `<WORKSPACE_PATH>/local-copy.json`, commit it:
 
   ```bash
   cd <WORKSPACE_PATH>
   git add local-copy.json
-  git commit -m "Add a copy on my computer" -m "Bot: <your bot name>"
+  git commit -m "Add a copy on my computer (yes: \"<the user's exact yes words>\")" -m "Bot: <your bot name>"
   ```
 
   then make the first copy (pack, copy the file, unpack). Windows, a `STOP:` line or a failed
-  copy: tell the user in one line and go on to step 11.
+  copy: tell the user in one line and go on to step 14.
 - **No:** say they can ask Bot Maker at any time: "make a copy on my computer".
 
-## 11. Report and hand over to the mentor tour
+## 14. Final message: hand the user to Mentor
 
-One short message: the two bots and their check results; where the repo is (and the copy, if one
-was made); how updates work (one sentence: "updates are offered, never applied without your yes;
-config.json and your own bots are never touched"). Then start the tour from `grokbotceo/skills/mentor/SKILL.md`, step 1.
+One short message in beginner's words, no technical words: what is ready (your main bot now
+knows GrokBotCEO; Bot Maker; Mentor; the Improvements channel), and anything that did not work, in
+one plain line each. One sentence: "Nothing changes without your yes." Then hand over:
+"Open Mentor in the list on the left; it will show you around." (Use the name from `MENTOR_BOT`.)
+Do not start the tour yourself.
 
 ---
 
@@ -188,10 +303,14 @@ config.json and your own bots are never touched"). Then start the tour from `gro
 |---|---|---|
 | `CreateAgent` | `name` (required), `description`, `section_id` | settings, routines, avatar, any other key |
 | `UpdateAgent` | `agent_id` (required), `name`, `description` | settings, routines, deletion |
+| `CreateChannel` | not verified in this release: read the arguments from GetDynamicTools | — |
+| `SendToAgent` | to a bot by `agent_id` (used in the owner's system); to a channel by its id: not verified | — |
 
 `description` is the bot's full working text. After `CreateAgent` or `UpdateAgent` the text is in
-`~/agent-data/agents/<agent_id>/profile.json` on the bot computer, readable from the shell; that is what the
-write check compares. Bot memory and routines are not on disk.
+`~/agent-data/agents/<agent_id>/profile.json` on the bot computer, readable from the shell; that is
+what the write check compares. Grok Bot trims trailing whitespace when it saves a description, so
+the build sends the text without it and the check ignores it. Bot memory and routines are not on
+disk.
 
 ## Reference: files of a bot in the release
 
@@ -199,6 +318,8 @@ write check compares. Bot memory and routines are not on disk.
 |---|---|
 | `bots/<bot>/prompt.md` | the bot's full text — the only source of `description` |
 | `bots/<bot>/profile.json` | name and metadata; metadata is stripped by the build |
+| `bots/main-grok/block.md` | the block added to the user's main bot (no profile.json: not a new bot) |
+| `bots/_blocks/<name>.md` | shared blocks; `[[block:<name>]]` in a text is replaced by the block |
 | `bots/<bot>/routines.md` | optional bots only: routines, not used in this release |
 | `bots/<bot>/settings.json` | optional bots only: settings, not used in this release |
 

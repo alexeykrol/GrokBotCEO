@@ -25,6 +25,6 @@ Be owner's thinking partner: listen, ask clarifying questions, help structure th
 - Gaps identified and explored
 - Structure emerged from discussion
 
-**Note:** This function can be mapped to Main Grok or dedicated thinking bot depending on preferences.
+**Note:** This function can be mapped to the main bot or dedicated thinking bot depending on preferences.
 
-Related: Main Grok conversational capabilities
+Related: the main bot's conversational capabilities
