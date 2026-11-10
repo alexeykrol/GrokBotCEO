@@ -88,6 +88,10 @@ KEY_DOCS: Dict[str, Tuple[str, str]] = {
 # Strict allowed placeholder keys (whitelist for all bots)
 ALLOWED_PLACEHOLDER_KEYS = frozenset(KEY_DOCS)
 
+# Bots the installer creates in this release (stage 1 of the roadmap). Keys used by these bots
+# are the only ones asked at install; every other key belongs to optional bots.
+STAGE1_BOTS = ("main-grok", "bot-maker")
+
 
 class CompileError(ValueError):
     """Any validation failure. Subclass of ValueError for backward compatibility."""
@@ -476,6 +480,12 @@ def placeholder_usage(bots_dir: Path) -> Dict[str, List[str]]:
     return {k: sorted(v) for k, v in usage.items()}
 
 
+def stage1_keys(bots_dir: Path) -> List[str]:
+    """Keys used by the bots this release installs (STAGE1_BOTS)."""
+    usage = placeholder_usage(bots_dir)
+    return sorted(k for k, bots in usage.items() if set(bots) & set(STAGE1_BOTS))
+
+
 def render_config_example() -> str:
     return json.dumps({k: KEY_DOCS[k][1] for k in sorted(KEY_DOCS)}, indent=2, ensure_ascii=False) + "\n"
 
@@ -494,15 +504,21 @@ def render_config_schema(usage: Dict[str, List[str]]) -> str:
         "in \"Used by\". \"Used by\" is computed from the compiled sources (`bots/*/prompt.md` and the",
         "`name` in `bots/*/profile.json`).",
         "",
-        "| Key | Meaning | Required? | Used by | Example (fictional) |",
-        "|---|---|---|---|---|",
+        "\"Stage 1\": this release installs only " + ", ".join(STAGE1_BOTS) + ". Keys marked **stage 1**",
+        "are used by these bots and are the only ones the installer writes to `config.json`. All other",
+        "keys are used by optional bots that this release does not install; `config.example.json`",
+        "keeps them so those bots still build.",
+        "",
+        "| Key | Meaning | Stage | Required? | Used by | Example (fictional) |",
+        "|---|---|---|---|---|---|",
     ]
     for key in sorted(KEY_DOCS):
         meaning, example = KEY_DOCS[key]
         bots = usage.get(key, [])
         required = "yes" if bots else "no (unused)"
         used_by = ", ".join(bots) if bots else "-"
-        lines.append(f"| `{key}` | {meaning} | {required} | {used_by} | `{example}` |")
+        stage = "**stage 1**" if set(bots) & set(STAGE1_BOTS) else "optional bots"
+        lines.append(f"| `{key}` | {meaning} | {stage} | {required} | {used_by} | `{example}` |")
     lines.append("")
     return "\n".join(lines)
 

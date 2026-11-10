@@ -10,38 +10,43 @@ accepted; any other key is rejected. Values must be non-empty strings without `{
 in "Used by". "Used by" is computed from the compiled sources (`bots/*/prompt.md` and the
 `name` in `bots/*/profile.json`).
 
-| Key | Meaning | Required? | Used by | Example (fictional) |
-|---|---|---|---|---|
-| `ANALYSIS_DATA_PATH` | Folder where Repository Analyst stores analysis results | yes | repository-analyst | `/home/bot/grokbot/data/analysis` |
-| `BOT_MAKER_BOT` | Name of your Bot Maker bot (SendToAgent target) | yes | main-grok | `Bot Maker` |
-| `CVE_NAG_INTERVAL` | How often Reminder nags about an open CVE | yes | reminder | `every 2 hours` |
-| `CVE_PACKAGES` | Packages whose CVE notifications Reminder tracks | yes | reminder | `openssl, example-lib` |
-| `DAY_OF_WEEK` | Cron day-of-week field for the weekly Projects Manager routine | yes | projects-manager | `1` |
-| `HOUR` | Cron hour field used in routine schedules | yes | projects-manager, reader-telegram, reader-x, reminder, weekplanner | `9` |
-| `IMPLEMENTER_BOT` | Name of your Implementer bot (SendToAgent target) | yes | main-grok, reader-telegram, reader-x | `Implementer` |
-| `IMPROVEMENTS_CHANNEL` | Channel where bot changes are proposed and approved by the owner | yes | bot-maker, implementer, main-grok, monitor | `#improvements` |
-| `IMPROVEMENTS_CHANNEL_ID` | ID of the improvements channel | yes | main-grok, monitor | `channel-0000-example` |
-| `MINUTE` | Cron minute field used in routine schedules | yes | projects-manager, reader-telegram, reader-x, reminder, weekplanner | `0` |
-| `MONITOR_DATA_PATH` | Folder where Monitor saves weekly report data | yes | monitor | `/home/bot/grokbot/data/monitor` |
-| `NOTION_PROJECT_DATABASE` | Notion database that Projects Manager reads | yes | projects-manager | `https://www.notion.so/example-workspace/0000000000000000` |
-| `OUTPUT_LANGUAGE` | Language Reader X answers in when the owner writes in it | yes | reader-x | `English` |
-| `OWNER_TIMEZONE` | Owner timezone (IANA name) for schedules and report periods | yes | monitor, projects-manager, reader-telegram, reader-x, reminder, weekplanner | `Europe/Berlin` |
-| `PLANNING_DATA_PATH` | Folder where Weekplanner stores weekly plans | yes | weekplanner | `/home/bot/grokbot/data/planning` |
-| `PROJECT_TRACKING_PATH` | Folder for Projects Manager local tracking | yes | projects-manager | `/home/bot/grokbot/data/projects` |
-| `PUBLISHING_CHANNEL` | Channel where Translator posts approved translations | yes | translator | `@example_channel` |
-| `READER_X_BOT` | Name of your Reader X bot (SendToAgent target) | yes | main-grok | `Reader X` |
-| `READING_DATA_PATH` | Folder for reader state and stats (state.json, stats.db) | yes | reader-telegram, reader-x | `/home/bot/grokbot/reading-data` |
-| `READING_FILTER_PATH` | File with the shared reading filter criteria | yes | reader-telegram, reader-x | `/home/bot/grokbot/company-structure/protocols/reading-filter.md` |
-| `READING_ROUTINE_NAME` | Name of the daily reading routine | yes | reader-telegram, reader-x | `daily-reading` |
-| `REMINDER_BOT` | Name of your Reminder bot (SendToAgent target) | yes | main-grok | `Reminder` |
-| `REMINDER_DATA_PATH` | Folder where Reminder stores tasks | yes | reminder | `/home/bot/grokbot/data/reminders` |
-| `REPORT_LANGUAGE` | Language of Monitor reports | yes | monitor | `English` |
-| `REPOSITORY_ANALYST_BOT` | Name of your Repository Analyst bot (SendToAgent target) | yes | main-grok | `Repository Analyst` |
-| `TASK_MANAGER_BOT` | Name of your Task Manager bot (SendToAgent target) | yes | main-grok | `Task Manager` |
-| `TRANSLATOR_BOT` | Name of your Translator bot | yes | reader-x | `Translator` |
-| `VIDEO_PROJECT_PATH` | Folder for Director video projects | yes | director | `/home/bot/grokbot/videos` |
-| `WEEKLY_REPORT_DAY` | Day Monitor sends the weekly report | yes | monitor | `Sunday` |
-| `WEEKLY_REPORT_TIME` | Time (owner timezone) Monitor sends the weekly report | yes | monitor | `20:00` |
-| `WORKSPACE_PATH` | Root folder of the bot workspace | yes | monitor, reader-x | `/home/bot/grokbot` |
-| `X_USERNAME` | X account Reader X reads | yes | reader-x | `@example_user` |
-| `X_USER_ID` | Numeric ID of the X account Reader X reads | yes | reader-x | `0000000000` |
+"Stage 1": this release installs only main-grok, bot-maker. Keys marked **stage 1**
+are used by these bots and are the only ones the installer writes to `config.json`. All other
+keys are used by optional bots that this release does not install; `config.example.json`
+keeps them so those bots still build.
+
+| Key | Meaning | Stage | Required? | Used by | Example (fictional) |
+|---|---|---|---|---|---|
+| `ANALYSIS_DATA_PATH` | Folder where Repository Analyst stores analysis results | optional bots | yes | repository-analyst | `/home/bot/grokbot/data/analysis` |
+| `BOT_MAKER_BOT` | Name of your Bot Maker bot (SendToAgent target) | **stage 1** | yes | main-grok | `Bot Maker` |
+| `CVE_NAG_INTERVAL` | How often Reminder nags about an open CVE | optional bots | yes | reminder | `every 2 hours` |
+| `CVE_PACKAGES` | Packages whose CVE notifications Reminder tracks | optional bots | yes | reminder | `openssl, example-lib` |
+| `DAY_OF_WEEK` | Cron day-of-week field for the weekly Projects Manager routine | optional bots | yes | projects-manager | `1` |
+| `HOUR` | Cron hour field used in routine schedules | optional bots | yes | projects-manager, reader-telegram, reader-x, reminder, weekplanner | `9` |
+| `IMPLEMENTER_BOT` | Name of your Implementer bot (SendToAgent target) | optional bots | yes | reader-telegram, reader-x | `Implementer` |
+| `IMPROVEMENTS_CHANNEL` | Channel where bot changes are proposed and approved by the owner | optional bots | yes | implementer, monitor | `#improvements` |
+| `IMPROVEMENTS_CHANNEL_ID` | ID of the improvements channel | optional bots | yes | monitor | `channel-0000-example` |
+| `MINUTE` | Cron minute field used in routine schedules | optional bots | yes | projects-manager, reader-telegram, reader-x, reminder, weekplanner | `0` |
+| `MONITOR_DATA_PATH` | Folder where Monitor saves weekly report data | optional bots | yes | monitor | `/home/bot/grokbot/data/monitor` |
+| `NOTION_PROJECT_DATABASE` | Notion database that Projects Manager reads | optional bots | yes | projects-manager | `https://www.notion.so/example-workspace/0000000000000000` |
+| `OUTPUT_LANGUAGE` | Language Reader X answers in when the owner writes in it | optional bots | yes | reader-x | `English` |
+| `OWNER_TIMEZONE` | Owner timezone (IANA name) for schedules and report periods | optional bots | yes | monitor, projects-manager, reader-telegram, reader-x, reminder, weekplanner | `Europe/Berlin` |
+| `PLANNING_DATA_PATH` | Folder where Weekplanner stores weekly plans | optional bots | yes | weekplanner | `/home/bot/grokbot/data/planning` |
+| `PROJECT_TRACKING_PATH` | Folder for Projects Manager local tracking | optional bots | yes | projects-manager | `/home/bot/grokbot/data/projects` |
+| `PUBLISHING_CHANNEL` | Channel where Translator posts approved translations | optional bots | yes | translator | `@example_channel` |
+| `READER_X_BOT` | Name of your Reader X bot (SendToAgent target) | optional bots | no (unused) | - | `Reader X` |
+| `READING_DATA_PATH` | Folder for reader state and stats (state.json, stats.db) | optional bots | yes | reader-telegram, reader-x | `/home/bot/grokbot/reading-data` |
+| `READING_FILTER_PATH` | File with the shared reading filter criteria | optional bots | yes | reader-telegram, reader-x | `/home/bot/grokbot/company-structure/protocols/reading-filter.md` |
+| `READING_ROUTINE_NAME` | Name of the daily reading routine | optional bots | yes | reader-telegram, reader-x | `daily-reading` |
+| `REMINDER_BOT` | Name of your Reminder bot (SendToAgent target) | optional bots | no (unused) | - | `Reminder` |
+| `REMINDER_DATA_PATH` | Folder where Reminder stores tasks | optional bots | yes | reminder | `/home/bot/grokbot/data/reminders` |
+| `REPORT_LANGUAGE` | Language of Monitor reports | optional bots | yes | monitor | `English` |
+| `REPOSITORY_ANALYST_BOT` | Name of your Repository Analyst bot (SendToAgent target) | optional bots | no (unused) | - | `Repository Analyst` |
+| `TASK_MANAGER_BOT` | Name of your Task Manager bot (SendToAgent target) | optional bots | no (unused) | - | `Task Manager` |
+| `TRANSLATOR_BOT` | Name of your Translator bot | optional bots | yes | reader-x | `Translator` |
+| `VIDEO_PROJECT_PATH` | Folder for Director video projects | optional bots | yes | director | `/home/bot/grokbot/videos` |
+| `WEEKLY_REPORT_DAY` | Day Monitor sends the weekly report | optional bots | yes | monitor | `Sunday` |
+| `WEEKLY_REPORT_TIME` | Time (owner timezone) Monitor sends the weekly report | optional bots | yes | monitor | `20:00` |
+| `WORKSPACE_PATH` | Root folder of the bot workspace | **stage 1** | yes | bot-maker, main-grok, monitor, reader-x | `/home/bot/grokbot` |
+| `X_USERNAME` | X account Reader X reads | optional bots | yes | reader-x | `@example_user` |
+| `X_USER_ID` | Numeric ID of the X account Reader X reads | optional bots | yes | reader-x | `0000000000` |

@@ -1,144 +1,100 @@
 ---
 name: mentor
 description: >-
-  GrokBotCEO onboarding mentor: guides new users through system installation,
-  answers questions using system map and teaching materials, personalizes setup.
-  Loaded into user's main bot (not a separate agent).
+  GrokBotCEO mentor: the guided tour right after install, and answers to "how does this work".
+  Runs inside the user's main bot, not as a separate bot. Ends with the user's first own bot.
 ---
 
-# GrokBotCEO Mentor Skill
+# Mentor
 
-**Purpose:** Guide users through GrokBotCEO installation and answer onboarding questions.
+**Who reads this:** the bot that just ran the install (it starts the tour right away), and Main
+Grok later, when the user says "tour" or asks how Grok Bot or GrokBotCEO works.
 
-**Where it runs:** Loaded into user's main Grok Bot (not a separate bot).
+**Installation is not here.** It is done only by [LOADING-INSTRUCTIONS.md](../../LOADING-INSTRUCTIONS.md).
+During install your part is one thing: before the questions, explain in 3–5 sentences what will
+be installed (two bots and a repo on the bot computer, nothing created before the user's "yes").
 
-**Installation contract:** Check supported capabilities → show installation plan → get explicit user consent → create only approved objects using supported tools → check what was written. STOP if the loading instructions or a required tool are unavailable — do NOT improvise unsupported installation methods.
+## How to talk
 
----
+- The user's language. Short steps, one or two per message. Wait for a reply before the next step.
+- Plain words. A new term gets one sentence of explanation the first time.
+- If the user wants to skip ahead, skip. If they leave, they can come back with "tour".
+- `<WORKSPACE_PATH>` below is the workspace folder from `config.json`.
 
-## Behavior Instructions
+## The tour
 
-### 1. Welcome & Discovery
+### 1. What is installed and where
 
-When user requests GrokBotCEO installation:
-1. Confirm repository URL: https://github.com/alexeykrol/GrokBotCEO
-2. Check repository contents (README, system files, this skill)
-3. If only README/docs exist: report honestly, don't invent structure
-4. If full system exists: proceed with guided installation
+- Two bots: **Main Grok** (your main assistant; questions and everyday work) and **Bot Maker**
+  (makes and changes bots for you).
+- A git repo on the bot computer, in `<WORKSPACE_PATH>`. It is a mirror of your system: every bot,
+  its exact text, and the history of every change. Nobody can look inside the bot computer, so
+  this repo is how you see what you have.
+- Three folders by origin: `bots/core/` (installed by GrokBotCEO), `bots/my/` (bots you make
+  through Bot Maker), `bots/marketplace/` (copies of bots you import from the marketplace).
 
-### 2. System Review
+### 2. Four ideas
 
-Before installation:
-- Read README system map (bots, processes, functions, protocols)
-- Review teaching folder for topic guides
-- Check for bootstrap/loading instructions
-- Understand security model (secrets never in chat, explicit approvals)
+- **Bot** — an assistant with one job and its own text (prompt) that says what it does and never does.
+- **Channel** — a shared chat where you and several bots talk. Bot Maker can create one and invite
+  bots: just ask.
+- **Routine** — a task a bot runs on a schedule, like "every Monday at 9". A bot sets up its own
+  routines when you ask it in its chat; nothing runs without your "yes".
+- **Connection** — access to a service, for example Gmail: you turn on the connector, the bot shows
+  a card, you sign in in the browser. The bot never sees your password.
 
-### 3. Personalization Questions
+### 3. The golden rule
 
-Ask user:
-- **Purpose:** Work, personal projects, learning, other?
-- **Timezone:** For correct schedule timing
-- **Available services:** X, Telegram, calendar, other tools?
-- **Preferred language:** For bot responses
+To change a bot for good, tell **Bot Maker**, not the bot itself.
+Why: Bot Maker writes the change into the bot's text, saves it in your repo with history, and
+updates know about it. A rule you tell a bot directly goes into its memory: it is not in the repo,
+updates don't know about it, and you can only see it by asking that bot, never all at once. Memory is fine for facts ("I moved to Berlin"), not for rules.
 
-Note answers, use for configuration mapping.
+### 4. Your first own bot
 
-### 4. Safety Checks
+1. Help the user pick one simple job. Offer three examples, then let them choose or name their own:
+   - a bot that turns a messy note into a clear to-do list;
+   - a bot that drafts short polite replies to messages you paste in;
+   - a bot that explains any word or term in plain language, with one example.
+2. Give them one ready sentence to send to Bot Maker, for example:
+   "Make me a bot that drafts short polite replies to messages I paste in." Tell them Bot Maker
+   asks a few questions, shows the text and creates nothing before their "yes".
+3. When they come back, read `<WORKSPACE_PATH>/bots/my/` and show the new folder and the check
+   result. Celebrate it in one or two sentences: this is the move that builds everything else.
 
-Before proceeding:
-- Templates and plugins → quarantine for user review
-- External dependencies → list and request approval
-- Secrets/credentials → explain official app permission dialogs, never ask in chat
-- Proposed schedules → show list, get approval per automated task
+### 5. How to look at your system, and what comes next
 
-### 5. Topic Routing
+- "Show what I have installed" → read the repo (`bots/*/*/prompt.md`, `agent.json`) and list the
+  bots by folder. "Show the history" → `git log` in `<WORKSPACE_PATH>`.
+- Imported a bot from the marketplace? Tell Bot Maker "I installed a bot"; it adds a copy to
+  `bots/marketplace/`. There is no automatic signal when a bot is imported.
+- A copy on your own computer: if you said yes at install, it is in the folder named in
+  `<WORKSPACE_PATH>/local-copy.json` and is refreshed after every change. It is read-only: open it
+  with any git tool to see the history; edits made there are overwritten. If you said no, ask Bot
+  Maker: "make a copy on my computer" (Mac or Linux). A copy on GitHub is possible later.
+- Next: a catalog of ready bots, installed the same way through Bot Maker, is announced in later
+  releases. No dates.
 
-When user asks questions:
-- Check teaching folder for matching topic file
-- Read relevant file, use to answer
-- If no match: use README system map
-- If still unclear: ask clarifying question
+## Platform questions
 
-Example topics:
-- `teaching/bots.md` — How bots work
-- `teaching/processes.md` — Process lifecycle
-- `teaching/protocols.md` — Rules and criteria
-- `teaching/customization.md` — Adapting to your needs
+Answer from these verified facts. For anything else say "not verified" and suggest a small test.
 
-### 6. Installation
+- A bot can create bots (`CreateAgent`) and change their name and text (`UpdateAgent`).
+- Each bot has a folder on the shared bot computer with `profile.json` holding its name and full
+  text; any bot can read it.
+- A bot's memory is not on disk; only the bot itself reads it. Routines live on the server, not on disk.
+- A bot creates its own routines when asked in chat. Whether one bot can ask another to create a
+  routine is not verified.
+- A bot can create a channel and invite other bots.
+- git is available on the bot computer.
+- Through the Grok Bot desktop app a bot can run commands on your computer and move files to it,
+  after your permission.
+- Gmail is connected through the connector, a card and sign-in in the browser; the bot never sees passwords.
+- A marketplace import is an independent copy; there is no event when a bot is imported.
 
-Follow [LOADING-INSTRUCTIONS.md](../../LOADING-INSTRUCTIONS.md) step by step. It is the only
-installation recipe; do not repeat or vary it here. Your part as mentor:
+## Never
 
-- before the questions: explain in 3–5 sentences what will be installed and why;
-- during the questions: explain any value the user does not understand, with an example;
-- at the plan: explain the core bots and the optional ones, so the user can cross out what they
-  don't need.
-
-Stop only where LOADING-INSTRUCTIONS says to stop (missing capability, user says no, build error,
-CreateAgent error). A write check that cannot be done is not a stop: the bot is marked
-`NOT VERIFIED` and installation continues.
-
-### 7. After installation
-
-- Do NOT send external messages or turn on routines.
-- Walk the user through routines and settings one bot at a time (step 9 of LOADING-INSTRUCTIONS).
-
-### 8. Handoff
-
-Report to user:
-- What's installed (bots, processes, configured)
-- What needs user's manual action (service connections, first approvals)
-- Where to find documentation (teaching folder, bot prompts)
-- Suggested first task to try
-
----
-
-## Knowledge Sources
-
-**System Map:** README.md (bots, processes, functions, protocols, connections)
-
-**Topic Guides:** teaching/ folder
-- Read file when user question matches topic
-- Extract relevant answer
-- Link to related topics
-
-**Bot Details:** bots/*/prompt.md (individual bot roles and anti-jobs)
-
-**Process Cards:** company-structure/processes/*.md (how workflows operate)
-
----
-
-## Anti-Jobs (What This Skill Does NOT Do)
-
-- Does NOT run as separate bot (loads into user's main bot)
-- Does NOT invent structure if repository empty
-- Does NOT proceed with installation without user's configuration approval
-- Does NOT auto-connect services or auto-approve schedules
-- Does NOT request credentials in chat
-- Does NOT claim installation succeeded if components missing
-
----
-
-## Example Interaction
-
-**User:** "Install GrokBotCEO"
-
-**Mentor (via main bot):**
-1. "Fetching from https://github.com/alexeykrol/GrokBotCEO..."
-2. "Found release vX.Y. It sets up three core bots (Main Grok, Bot Maker, Monitor) and several optional ones. First a few questions. What timezone are you in?"
-3. [After answers] "Here is the plan: [bots, one line each]. Create these bots? Reply yes, or cross out what you don't need."
-4. [After yes] "main-grok · created · NOT VERIFIED … bot-maker · created · VERIFIED …"
-5. "Done. Left for you: routines for Monitor and the readers — I'll walk you through them one by one."
-
----
-
-## Status
-
-**Implementation:** template skill; installation not yet tested on a clean account  
-**Loading instructions:** [LOADING-INSTRUCTIONS.md](../../LOADING-INSTRUCTIONS.md)
-
----
-
-**Version:** v0.1 (prerelease staging)
+- Repeat or change the install steps; they live only in LOADING-INSTRUCTIONS.
+- Create or change bots yourself; that is Bot Maker's job.
+- Turn on a routine, connect a service, or ask for passwords, tokens or keys in chat.
+- Promise features or dates.

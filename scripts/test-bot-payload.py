@@ -6,9 +6,11 @@ NO live bot creation - fictional fixtures only
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
@@ -1168,6 +1170,423 @@ class TestConfigExampleGeneration(unittest.TestCase):
         self.assertIn("NOT_A_KEY", r.stderr)
         self.assertFalse((self.tmp / "out").exists())
 
+
+MIRROR_SCRIPT = SCRIPT_DIR / "bot-mirror.py"
+
+
+class TestStage1(unittest.TestCase):
+    """rc2 = stage 1: only main-grok and bot-maker are installed, with stage-1 keys only"""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.compiler = _load_compiler_module()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_stage1_bots(self):
+        self.assertEqual(tuple(self.compiler.STAGE1_BOTS), ("main-grok", "bot-maker"))
+
+    def test_stage1_keys(self):
+        """The installer fills exactly these keys itself (LOADING-INSTRUCTIONS step 4)"""
+        keys = self.compiler.stage1_keys(REAL_BOTS_DIR)
+        self.assertEqual(keys, ["BOT_MAKER_BOT", "WORKSPACE_PATH"])
+        loading = (ROOT_DIR / "LOADING-INSTRUCTIONS.md").read_text(encoding="utf-8")
+        for key in keys:
+            self.assertIn(f"`{key}`", loading)
+
+    def test_build_with_only_stage1_keys(self):
+        keys = self.compiler.stage1_keys(REAL_BOTS_DIR)
+        config = self.tmp / "config.json"
+        config.write_text(json.dumps({k: self.compiler.KEY_DOCS[k][1] for k in keys}))
+        out = self.tmp / "build"
+        r = _run("build", "--config", config, "--bots", "main-grok,bot-maker", "--out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(sorted(p.name for p in out.iterdir()),
+                         ["bot-maker.md", "bot-maker.payload.json", "main-grok.md", "main-grok.payload.json"])
+        names = {json.loads((out / f"{b}.payload.json").read_text(encoding="utf-8"))["name"]
+                 for b in ("main-grok", "bot-maker")}
+        self.assertEqual(names, {"Main Grok", "Bot Maker"})
+        for md in out.glob("*.md"):
+            text = md.read_text(encoding="utf-8")
+            self.assertNotIn("{{", text, md.name)
+            self.assertNotIn("}}", text, md.name)
+
+    def test_stage1_build_fails_without_a_stage1_key(self):
+        keys = self.compiler.stage1_keys(REAL_BOTS_DIR)
+        for missing in keys:
+            with self.subTest(missing=missing):
+                config = self.tmp / f"config-{missing}.json"
+                config.write_text(json.dumps({k: self.compiler.KEY_DOCS[k][1] for k in keys if k != missing}))
+                out = self.tmp / f"out-{missing}"
+                r = _run("build", "--config", config, "--bots", "main-grok,bot-maker", "--out", out)
+                self.assertNotEqual(r.returncode, 0)
+                self.assertIn(missing, r.stderr)
+                self.assertFalse(out.exists())
+
+    def test_stage1_prompts_name_no_uninstalled_bot(self):
+        """Stage-1 bots must not route to bots this release does not install"""
+        import re
+        for bot in self.compiler.STAGE1_BOTS:
+            with self.subTest(bot=bot):
+                text = (REAL_BOTS_DIR / bot / "prompt.md").read_text(encoding="utf-8")
+                bot_keys = set(re.findall(r"\{\{([A-Z_]+_BOT)\}\}", text))
+                self.assertLessEqual(bot_keys, {"BOT_MAKER_BOT"})
+
+    def test_schema_marks_stage1_keys(self):
+        keys = set(self.compiler.stage1_keys(REAL_BOTS_DIR))
+        schema = ROOT_CONFIG_SCHEMA.read_text(encoding="utf-8")
+        for key in self.compiler.ALLOWED_PLACEHOLDER_KEYS:
+            row = next(l for l in schema.splitlines() if l.startswith(f"| `{key}` |"))
+            if key in keys:
+                self.assertIn("**stage 1**", row)
+            else:
+                self.assertIn("optional bots", row)
+
+    def test_loading_instructions_use_repo_mirror(self):
+        loading = (ROOT_DIR / "LOADING-INSTRUCTIONS.md").read_text(encoding="utf-8")
+        for needle in ["--bots main-grok,bot-maker", "~/agent-data/agents/<agent_id>/profile.json",
+                       "bots/core/", "bots/my/", "bots/marketplace/", "git init", "Bot: "]:
+            self.assertIn(needle, loading)
+
+
+class TestPublicTreeHygiene(unittest.TestCase):
+    """No leftovers of the third-party Bot Maker template anywhere in the public tree"""
+
+    # Assembled from parts so this file does not contain the words itself
+    FORBIDDEN = ["pote" + "to", "mad" + "-scientist", "mad" + " scientist", "ps" + "tack"]
+
+    def test_no_third_party_template_words(self):
+        hits = []
+        for path in sorted(ROOT_DIR.rglob("*")):
+            if not path.is_file() or "__pycache__" in path.parts:
+                continue
+            text = path.read_bytes().decode("utf-8", errors="ignore").lower()
+            rel = str(path.relative_to(ROOT_DIR)).lower()
+            for word in self.FORBIDDEN:
+                if word in text or word in rel:
+                    hits.append(f"{path.relative_to(ROOT_DIR)}: {word}")
+        self.assertEqual(hits, [])
+
+
+def _mirror(*args):
+    return subprocess.run([sys.executable, "-B", str(MIRROR_SCRIPT)] + [str(a) for a in args],
+                          capture_output=True, text=True)
+
+
+class TestBotMirror(unittest.TestCase):
+    """bot-mirror.py: write check, scan for unknown bots, name+description snapshot only"""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.agents = self.tmp / "agents"
+        self.ws = self.tmp / "ws"
+        self.ws.mkdir()
+        self.expected = self.tmp / "expected.md"
+        self.expected.write_text("Exact text\nline two\n", encoding="utf-8")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _agent(self, agent_id, name, description, extra=None):
+        d = self.agents / agent_id
+        d.mkdir(parents=True)
+        profile = {"name": name, "description": description, "harness": "x"}
+        (d / "profile.json").write_text(json.dumps(profile), encoding="utf-8")
+        for fname, content in (extra or {}).items():
+            (d / fname).write_text(content)
+        return d
+
+    def _record(self, origin, slug, agent_id):
+        d = self.ws / "bots" / origin / slug
+        d.mkdir(parents=True)
+        (d / "agent.json").write_text(json.dumps({"agent_id": agent_id}))
+
+    def _check(self, agent_id):
+        r = _mirror("check", "--agent-id", agent_id, "--expected", self.expected, "--agents-dir", self.agents)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r.stdout.strip()
+
+    def test_check_verified(self):
+        self._agent("a1", "Alpha", "Exact text\nline two\n")
+        self.assertEqual(self._check("a1"), "VERIFIED")
+
+    def test_check_mismatch_on_any_difference(self):
+        self._agent("a1", "Alpha", "Exact text\nline two")  # missing final newline
+        self.assertEqual(self._check("a1"), "MISMATCH")
+
+    def test_check_not_verified_when_file_missing_or_bad(self):
+        self.assertEqual(self._check("missing"), "NOT VERIFIED")
+        d = self.agents / "bad"
+        d.mkdir(parents=True)
+        (d / "profile.json").write_text("{not json")
+        self.assertEqual(self._check("bad"), "NOT VERIFIED")
+        d = self.agents / "nodesc"
+        d.mkdir(parents=True)
+        (d / "profile.json").write_text(json.dumps({"name": "X"}))
+        self.assertEqual(self._check("nodesc"), "NOT VERIFIED")
+
+    def test_invalid_agent_id_rejected(self):
+        for bad in ["../x", "a/b", ".hidden", ""]:
+            with self.subTest(agent_id=bad):
+                r = _mirror("check", "--agent-id", bad, "--expected", self.expected, "--agents-dir", self.agents)
+                self.assertNotEqual(r.returncode, 0)
+
+    def test_scan_lists_only_unknown_bots(self):
+        self._agent("core1", "Main Grok", "t")
+        self._agent("my1", "Note Bot", "t")
+        self._agent("new1", "Imported Bot", "t")
+        self._record("core", "main-grok", "core1")
+        self._record("my", "note-bot", "my1")
+        r = _mirror("scan", "--workspace", self.ws, "--agents-dir", self.agents)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(r.stdout), [{"agent_id": "new1", "name": "Imported Bot"}])
+
+    def test_snapshot_keeps_non_latin_names(self):
+        self._agent("ru1", "Помощник по почте", "t")
+        self._agent("sym1", "***", "t")
+        for agent_id, slug in (("ru1", "помощник-по-почте"), ("sym1", "bot")):
+            with self.subTest(agent_id=agent_id):
+                r = _mirror("snapshot", "--workspace", self.ws, "--agent-id", agent_id, "--agents-dir", self.agents)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertTrue((self.ws / "bots" / "marketplace" / slug / "prompt.md").is_file())
+
+    def test_scan_unreadable_agents_dir_fails(self):
+        r = _mirror("scan", "--workspace", self.ws, "--agents-dir", self.tmp / "nope")
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_snapshot_copies_only_name_and_description(self):
+        self._agent("new1", "Imported Bot!", "Imported text\n",
+                    {"store.db": "DB", "box-secrets.json": "{}", "settings.json": "{}"})
+        r = _mirror("snapshot", "--workspace", self.ws, "--agent-id", "new1", "--source", "marketplace",
+                    "--agents-dir", self.agents)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        target = self.ws / "bots" / "marketplace" / "imported-bot"
+        self.assertEqual(sorted(p.name for p in target.iterdir()), ["agent.json", "prompt.md"])
+        self.assertEqual((target / "prompt.md").read_text(encoding="utf-8"), "Imported text\n")
+        self.assertEqual(json.loads((target / "agent.json").read_text()),
+                         {"agent_id": "new1", "source": "marketplace"})
+        # second snapshot of the same bot is refused; the record is now known
+        r = _mirror("snapshot", "--workspace", self.ws, "--agent-id", "new1", "--agents-dir", self.agents)
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_snapshot_slug_collision_and_bad_source(self):
+        self._agent("n1", "Same Name", "one")
+        self._agent("n2", "Same Name", "two")
+        for agent_id in ("n1", "n2"):
+            r = _mirror("snapshot", "--workspace", self.ws, "--agent-id", agent_id, "--agents-dir", self.agents)
+            self.assertEqual(r.returncode, 0, r.stderr)
+        base = self.ws / "bots" / "marketplace"
+        self.assertEqual(sorted(p.name for p in base.iterdir()), ["same-name", "same-name-2"])
+        self._agent("n3", "Other", "x")
+        r = _mirror("snapshot", "--workspace", self.ws, "--agent-id", "n3", "--source", "github",
+                    "--agents-dir", self.agents)
+        self.assertNotEqual(r.returncode, 0)
+
+
+
+LOCAL_COPY_DOC = ROOT_DIR / "LOCAL-COPY.md"
+
+
+def _isolated_git_env(tmp: Path) -> dict:
+    """git that ignores the host's global/system config (no signing, no hooks path, fixed user)."""
+    cfg = tmp / "gitconfig"
+    cfg.write_text("[user]\n\tname = Test\n\temail = test@example.com\n"
+                   "[init]\n\tdefaultBranch = main\n[commit]\n\tgpgsign = false\n")
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env.update({"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": str(cfg), "GIT_TERMINAL_PROMPT": "0"})
+    return env
+
+
+@unittest.skipUnless(shutil.which("git"), "git is not installed")
+class TestLocalCopy(unittest.TestCase):
+    """bot-mirror.py pack (bot computer) + the unpack block of LOCAL-COPY.md (user's computer)"""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.env = _isolated_git_env(self.tmp)
+        self.ws = self.tmp / "ws"
+        self.archive = self.ws / "build" / "local-copy.tar.gz"
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _git(self, *args, cwd=None):
+        r = subprocess.run(["git", *args], cwd=cwd or self.ws, env=self.env, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r.stdout
+
+    def _write(self, rel, text):
+        path = self.ws / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+    def _make_repo(self):
+        self._write("bots/core/x/prompt.md", "Prompt v1\n")
+        self._write("config.json", '{"WORKSPACE_PATH": "ws"}\n')
+        self._write(".gitignore", "grokbotceo/\nbuild/\n")
+        self._write("untracked.txt", "not committed\n")
+        self._write("build/stale.txt", "build output\n")
+        self._write("grokbotceo/VERSION", "release copy\n")
+        self._git("init", "-q")
+        self._git("add", ".gitignore", "config.json", "bots")
+        self._git("commit", "-q", "-m", "Install GrokBotCEO", "-m", "Bot: Test")
+
+    def _pack(self, workspace=None):
+        return subprocess.run([sys.executable, "-B", str(MIRROR_SCRIPT), "pack",
+                               "--workspace", str(workspace or self.ws), "--out", str(self.archive)],
+                              capture_output=True, text=True, env=self.env)
+
+    def _block(self):
+        text = LOCAL_COPY_DOC.read_text(encoding="utf-8")
+        blocks = re.findall(r"^```sh\n(.*?)^```$", text, re.M | re.S)
+        self.assertEqual(len(blocks), 1, "LOCAL-COPY.md must hold exactly one ```sh block")
+        self.assertEqual(text.count("```sh"), 1)
+        self.assertTrue(blocks[0].startswith('P="<path>"\nA="<path>.tar.gz"\n'))
+        self.assertEqual(blocks[0].count("<path>"), 2)
+        return blocks[0]
+
+    def _deliver(self, path):
+        """Stand-in for copying the archive to <path>.tar.gz on the user's computer."""
+        shutil.copyfile(self.archive, f"{path}.tar.gz")
+
+    def _unpack(self, path, shell="/bin/sh"):
+        script = self._block().replace("<path>", str(path))
+        return subprocess.run([shell, "-c", script], cwd=self.tmp, env=self.env,
+                              capture_output=True, text=True)
+
+    # --- pack ---------------------------------------------------------------
+
+    def test_pack_holds_committed_repo_only(self):
+        self._make_repo()
+        os.symlink("config.json", self.ws / "link")
+        self._git("add", "link")
+        self._git("config", "core.pager", "cat")
+        self._git("commit", "-q", "-m", "Add link")
+        hook = self.ws / ".git" / "hooks" / "post-checkout"
+        hook.write_text("#!/bin/sh\nexit 0\n")
+        hook.chmod(0o755)
+        r = self._pack()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        head = self._git("rev-parse", "--short", "HEAD").strip()
+        self.assertEqual(r.stdout.splitlines(), [str(self.archive), f"commit {head}"])
+        with tarfile.open(self.archive) as tar:
+            members = tar.getmembers()
+            names = [m.name for m in members]
+            config = tar.extractfile(".git/config").read().decode("utf-8")
+        self.assertEqual(names[0], ".grokbotceo-copy")
+        for name in (".git/HEAD", "bots/core/x/prompt.md", "config.json", ".gitignore"):
+            self.assertIn(name, names)
+        for name in names:
+            with self.subTest(member=name):
+                self.assertFalse(name.startswith("/"))
+                self.assertNotIn("..", name)
+                self.assertNotIn(name, ("untracked.txt", "link"))
+                self.assertFalse(name.startswith(("build/", "grokbotceo/", ".git/hooks")))
+        self.assertTrue(all(m.isfile() or m.isdir() for m in members), "no symlinks in the archive")
+        self.assertNotIn("pager", config)
+        self.assertNotIn("[user]", config)
+
+    def test_pack_refuses_uncommitted_changes(self):
+        self._make_repo()
+        self._write("config.json", '{"changed": true}\n')
+        r = self._pack()
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("uncommitted", r.stderr)
+        self.assertFalse(self.archive.exists())
+
+    def test_pack_refuses_non_repo_and_empty_repo(self):
+        plain = self.tmp / "plain"
+        plain.mkdir()
+        (plain / "a.txt").write_text("a")
+        r = self._pack(plain)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("not a git repo", r.stderr)
+        self.ws.mkdir()
+        self._git("init", "-q")
+        r = self._pack()
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("no commit", r.stderr)
+        self.assertFalse(self.archive.exists())
+
+    # --- unpack block -------------------------------------------------------
+
+    def test_unpack_first_install(self):
+        self._make_repo()
+        self.assertEqual(self._pack().returncode, 0)
+        shells = ["/bin/sh"] + [s for s in (shutil.which("dash"), shutil.which("bash"), shutil.which("zsh")) if s]
+        for shell in shells:
+            with self.subTest(shell=shell):
+                copy = self.tmp / "home" / Path(shell).name / "GrokBotCEO-copy"
+                copy.parent.mkdir(parents=True)
+                self._deliver(copy)
+                r = self._unpack(copy, shell)
+                self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+                self.assertIn("COPY UPDATED", r.stdout)
+                self.assertTrue((copy / ".grokbotceo-copy").is_file())
+                self.assertEqual((copy / "bots/core/x/prompt.md").read_text(encoding="utf-8"), "Prompt v1\n")
+                self.assertFalse(Path(f"{copy}.tar.gz").exists())
+                self.assertFalse(Path(f"{copy}.new").exists())
+                self.assertFalse((copy / "untracked.txt").exists())
+                self.assertIn("Install GrokBotCEO", self._git("log", "--format=%s", cwd=copy))
+                self.assertEqual(self._git("status", "--porcelain", cwd=copy), "")
+
+    def test_unpack_second_run_replaces_copy(self):
+        self._make_repo()
+        self.assertEqual(self._pack().returncode, 0)
+        copy = self.tmp / "GrokBotCEO-copy"
+        self._deliver(copy)
+        self.assertEqual(self._unpack(copy).returncode, 0)
+        (copy / "edited-by-user.txt").write_text("overwritten on refresh")
+        self._write("bots/core/x/prompt.md", "Prompt v2\n")
+        self._git("commit", "-q", "-am", "Change x", "-m", "Bot: Bot Maker")
+        self.assertEqual(self._pack().returncode, 0)
+        self._deliver(copy)
+        r = self._unpack(copy)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("COPY UPDATED", r.stdout)
+        self.assertEqual((copy / "bots/core/x/prompt.md").read_text(encoding="utf-8"), "Prompt v2\n")
+        self.assertFalse((copy / "edited-by-user.txt").exists())
+        self.assertEqual(self._git("log", "--format=%s", cwd=copy).splitlines(), ["Change x", "Install GrokBotCEO"])
+
+    def test_unpack_refuses_folder_without_marker(self):
+        self._make_repo()
+        self.assertEqual(self._pack().returncode, 0)
+        home = self.tmp / "home"
+        home.mkdir()
+        (home / "keep.txt").write_text("mine")
+        self._deliver(home)
+        r = self._unpack(home)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("STOP", r.stdout)
+        self.assertEqual(sorted(p.name for p in home.iterdir()), ["keep.txt"])
+        self.assertEqual((home / "keep.txt").read_text(), "mine")
+        self.assertFalse(Path(f"{home}.new").exists())
+        self.assertTrue(Path(f"{home}.tar.gz").exists())
+
+    def test_unpack_refuses_stale_new_folder_without_marker(self):
+        self._make_repo()
+        self.assertEqual(self._pack().returncode, 0)
+        copy = self.tmp / "GrokBotCEO-copy"
+        stale = Path(f"{copy}.new")
+        stale.mkdir()
+        (stale / "keep.txt").write_text("mine")
+        self._deliver(copy)
+        r = self._unpack(copy)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("STOP", r.stdout)
+        self.assertEqual(sorted(p.name for p in stale.iterdir()), ["keep.txt"])
+        self.assertFalse(copy.exists())
+
+    def test_unpack_refuses_relative_or_empty_path(self):
+        self._make_repo()
+        self.assertEqual(self._pack().returncode, 0)
+        for path in ("relative/copy", ""):
+            with self.subTest(path=path):
+                r = self._unpack(path)
+                self.assertNotEqual(r.returncode, 0)
+                self.assertTrue(r.stdout.startswith("STOP:"), r.stdout)
+        self.assertEqual(sorted(p.name for p in self.tmp.iterdir()), ["gitconfig", "ws"])
 
 class TestCLI(unittest.TestCase):
     def test_help_works(self):

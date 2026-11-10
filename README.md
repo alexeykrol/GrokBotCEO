@@ -1,8 +1,7 @@
 # GrokBotCEO
 
-A ready set of Grok Bot bots, processes, protocols and skills for running a business and a product
-with AI bots. You install it once by pasting one command into your Grok Bot chat; after that the
-bots are yours to change.
+A ready set of Grok Bot bots for running a business and a product with AI bots. You install it
+once by pasting one command into your Grok Bot chat; after that the bots are yours to change.
 
 **Version:** see [VERSION](VERSION) — this is a release candidate. The install has been checked
 with dry builds and tests, not yet on many real accounts. Reports are welcome in Issues.
@@ -11,71 +10,80 @@ with dry builds and tests, not yet on many real accounts. Reports are welcome in
 
 → [ONBOARDING.md](ONBOARDING.md) (English) · [ONBOARDING.ru.md](ONBOARDING.ru.md) (Русский)
 
-About 20 minutes. Your bot asks a few questions, shows a plan, and creates nothing before your
-"yes". Routines (schedules) you set up yourself, with step-by-step guidance.
+About 20–30 minutes, including your first own bot. Your bot shows a plan and creates nothing
+before your "yes".
+
+## What this release installs (stage 1: the core)
+
+- **Main Grok** — your main assistant. It carries the **mentor**: a short guided tour after install
+  that explains bots, channels, routines and connections, and ends with you creating your first
+  own bot.
+- **Bot Maker** — creates and changes bots for you. You say what bot you need; it asks a few
+  questions, shows the text, creates the bot after your "yes", checks what was written and saves it.
+- **A repo mirror** of your system: your workspace on the bot computer becomes a git repo.
+- **An optional copy on your own computer** (Mac or Linux): right after install your bot offers a
+  read-only copy of that repo on your computer, refreshed after every change. Say yes or no; you
+  can ask Bot Maker for it later.
+
+```
+<workspace>/
+  bots/core/          our bots as installed
+  bots/my/            bots you make through Bot Maker
+  bots/marketplace/   copies of bots you import from the marketplace (name and text only)
+  config.json         your values
+  local-copy.json     optional: where the copy on your computer is
+  VERSION             installed version
+```
+
+Every change Bot Maker makes is a commit, signed with the name of the bot that made it. No remote
+is set up; a copy on GitHub is optional and comes later.
+
+Later stages add a catalog of ready bots (installed the same way, through Bot Maker), then an
+improvement loop, then processes and teams. Their bots are already in `bots/` but not installed yet.
 
 ## What is inside
 
 | Folder | What it holds |
 |---|---|
-| `bots/` | one folder per bot: `prompt.md` (the bot's full text), `profile.json` (name and metadata), and where needed `routines.md` and `settings.json` |
-| `company-structure/processes/` | recurring workflows the bots follow |
-| `company-structure/protocols/` | shared rules: reading filter, board, handoff, review |
-| `company-structure/functions/` | operations called on demand, such as applying a change to a bot |
-| `skills/` | reusable instructions: `mentor` (explains and installs), `post` (translation workflow) |
-| `scripts/` | the build script that turns bot texts and your `config.json` into payloads, reader tools, tests |
-| `data-schemas/` | schemas of the data files the reader bots keep |
-| `teaching/` | how bots, processes and protocols work and how to customize them |
-
-### Bots
-
-Core, installed by default:
-
-- **Main Grok** — your main assistant; routes specialized work to the other bots
-- **Bot Maker** — creates and changes bots for you
-- **Monitor** — weekly report on how the bots are used, with improvement proposals
-
-Optional:
-
-- **Reader X**, **Reader Telegram** — filter posts by practical relevance and route them
-- **Implementer** — reviews posts about agents and tools and proposes what to adopt
-- **Translator** — translates posts in two passes; a human publishes
-- **Weekplanner** — weekly plan on Monday, tracking during the week, review on Sunday
-- **Reminder** — one-off tasks and nudges
-- **Projects Manager** — runs team projects from Notion
-- **Task Manager**, **Repository Analyst** — work on local project folders (need a connection to your computer)
-
-`bots/director/` is included as a reference and is not offered by the installer in this version.
+| `bots/` | one folder per bot: `prompt.md` (the bot's full text) and `profile.json` (name) |
+| `skills/mentor/` | the guided tour and answers about how the system works |
+| `scripts/` | the build script (bot texts + your `config.json` → payloads), `bot-mirror.py` (write check, marketplace copies, the archive for the copy on your computer), tests |
+| `company-structure/`, `teaching/`, `data-schemas/`, `skills/post/` | material for later stages |
 
 ## How it is built
 
 - A bot's text lives in one place, `bots/<bot>/prompt.md`, with `{{KEY}}` placeholders.
 - Your values live in `config.json` in your workspace ([example](config.example.json),
-  [all keys](config.schema.md)).
+  [all keys](config.schema.md)). Stage 1 needs two keys, both filled in by the installer.
 - `scripts/bot-payload-compiler.py build` combines the two. It checks every bot first and writes
   nothing if a key is unknown or a placeholder is left unfilled.
 
 ## Updates
 
-Nothing updates by itself. New versions appear as releases of this repository; when you tell your
-bot "update", it shows what changed, bot by bot, and asks first. Updates change algorithms and
-rules, never your `config.json`. If you edited a bot by hand, you are warned before an update would
-overwrite that edit and can take the update, skip it, or ask Bot Maker to merge your edit.
+Nothing updates by itself. New versions are announced in the releases of this repository and in
+the author's Telegram channel. The update procedure comes with stage 2; these are the rules it
+follows:
+
+- you say "update"; your bot shows what changed, bot by bot, and asks first;
+- `config.json`, `bots/my/` and `bots/marketplace/` are never touched;
+- a core bot you changed is not touched without your answer: take the update, skip it, or ask
+  Bot Maker to carry your change into the new version.
 
 ## Security
 
 - Secrets never go in chat. Services are connected in the Grok Bot settings.
-- No bot is created, no message sent and no routine turned on without your "yes".
-- `config.json` and your workspace stay on your Grok Bot computer.
+- No bot is created or changed, no message sent and no routine turned on without your "yes".
+- `config.json` and your repo live on your Grok Bot computer. Nothing is pushed anywhere. The
+  optional copy goes only to your own computer, and only after your yes.
 
 ## Tests
 
 No network and no live bots needed:
 
 ```bash
-python3 scripts/test-bot-payload.py
-python3 scripts/test-reader.py
-python3 scripts/test-sync.py
+python3 -B scripts/test-bot-payload.py
+python3 -B scripts/test-reader.py
+python3 -B scripts/test-sync.py
 ```
 
 ## License

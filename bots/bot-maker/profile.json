@@ -1,9 +1,4 @@
 {
   "name": "Bot Maker",
-  "title": "",
-  "avatarShape": "teardrop",
-  "avatarColor": "red",
-  "namedBy": "user",
-  "harness": "temporal",
-  "_comment": "Remove 'serverId' before creating bot - use your actual server ID. Persona lives only in prompt.md (do not add a description field here)."
+  "_comment": "Name only. The bot's text lives in prompt.md (do not add a description field here)."
 }
