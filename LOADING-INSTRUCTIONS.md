@@ -60,6 +60,9 @@ for `main-grok` it also has `"mode": "extended"`, and `"check"` may be `NOT APPL
 
 Get the latest release of https://github.com/alexeykrol/GrokBotCEO into `<WORKSPACE_PATH>/grokbotceo/`
 (`git clone --depth 1 --branch <latest tag>`, or the release archive). Read `grokbotceo/VERSION`.
+"Latest" is the release GitHub marks Latest on the repository's Releases page (the releases/latest
+link). If that cannot be read, take the highest version tag,
+counting release candidates. Never ask the user which version to install: picking it is your job.
 
 If `<WORKSPACE_PATH>/VERSION` (or `installed/VERSION` from an earlier release candidate) already
 exists, this is not a first install: tell the user which version is installed and stop. Updating is

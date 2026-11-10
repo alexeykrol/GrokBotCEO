@@ -1567,7 +1567,7 @@ class TestRc3Mechanics(unittest.TestCase):
         self.assertEqual(hits, [])
 
     def test_version(self):
-        self.assertEqual((ROOT_DIR / "VERSION").read_text(encoding="utf-8").strip(), "0.1.0-rc3")
+        self.assertEqual((ROOT_DIR / "VERSION").read_text(encoding="utf-8").strip(), "0.1.0-rc4")
 
 
 class TestPublicTreeHygiene(unittest.TestCase):
