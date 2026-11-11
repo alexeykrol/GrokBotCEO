@@ -24,7 +24,7 @@ Commands:
                               and write <id>.previous.md (as it was), <id>.md (old text,
                               rstripped + blank line + the block) and <id>.payload.json
                               (UpdateAgent: agent_id + description; the name is not touched)
-  compose --name NAME --text FILE --slug SLUG --out DIR
+  compose --name NAME --text FILE --slug SLUG --out DIR [--section-id ID]
                               a bot the user makes through Bot Maker: the user's text +
                               blank line + the routing block; writes <slug>.md and
                               <slug>.payload.json (CreateAgent: name + description)
@@ -46,7 +46,7 @@ BLOCKS_DIRNAME = "_blocks"
 INCLUDE_RE = re.compile(r'\[\[block:([^\]]*)\]\]')
 BLOCK_NAME_RE = re.compile(r'^[a-z0-9][a-z0-9-]*$')
 AGENT_ID_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]*$')
-# The standard routing block (lasting changes -> the Improvements channel -> Bot Maker).
+# The standard routing block (lasting changes -> Bot Maker, who clarifies them in #Improvements).
 ROUTING_BLOCK = "routing"
 
 # Supported CreateAgent arguments (whitelist)
@@ -78,7 +78,7 @@ KEY_DOCS: Dict[str, Tuple[str, str]] = {
     "HOUR": ("Cron hour field used in routine schedules", "9"),
     "IMPLEMENTER_BOT": ("Name of your Implementer bot (SendToAgent target)", "Implementer"),
     "IMPROVEMENTS_CHANNEL": ("Channel where bot changes are proposed and approved by the owner", "#improvements"),
-    "IMPROVEMENTS_CHANNEL_ID": ("ID of the Improvements channel; written by the installer after it creates the channel", "channel-0000-example"),
+    "IMPROVEMENTS_CHANNEL_ID": ("ID of the #Improvements channel; written by the installer after it creates the channel", "channel-0000-example"),
     "MENTOR_BOT": ("Name of your Mentor bot as shown in the sidebar (may be in your language)", "Mentor"),
     "MINUTE": ("Cron minute field used in routine schedules", "0"),
     "MONITOR_DATA_PATH": ("Folder where Monitor saves weekly report data", "/home/bot/grokbot/data/monitor"),
@@ -591,11 +591,13 @@ def routing_block(bots_dir: Path, params: Dict[str, str]) -> str:
     return resolve_placeholders(load_block(bots_dir / BLOCKS_DIRNAME, ROUTING_BLOCK), params).strip()
 
 
-def compile_compose(bots_dir: Path, name: str, text: str, params: Dict[str, str]) -> Dict[str, Any]:
+def compile_compose(bots_dir: Path, name: str, text: str, params: Dict[str, str],
+                    section_id: Optional[str] = None) -> Dict[str, Any]:
     """CreateAgent payload for a user's bot: the user's text + blank line + the routing block.
 
     The user's text is taken as is (no placeholders are resolved in it). If it already holds the
-    routing block (a change to a bot made earlier), the block is not added twice.
+    routing block (a change to a bot made earlier), the block is not added twice. section_id puts
+    the new bot into an existing section of the user's sidebar (CreateAgent section_id).
     """
     if not isinstance(name, str) or not name.strip():
         raise CompileError("--name is empty")
@@ -604,6 +606,8 @@ def compile_compose(bots_dir: Path, name: str, text: str, params: Dict[str, str]
     block = routing_block(bots_dir, params)
     description = text.rstrip() if block in text else combine_text(text, block)
     payload = {"name": name.strip(), "description": description}
+    if section_id:
+        payload["section_id"] = section_id
     leaked = set(payload) - CREATE_AGENT_WHITELIST
     if leaked:
         raise CompileError(f"Payload contains non-whitelisted keys: {leaked}")
@@ -611,14 +615,14 @@ def compile_compose(bots_dir: Path, name: str, text: str, params: Dict[str, str]
 
 
 def compose(bots_dir: Path, name: str, text_file: Path, slug: str, params: Dict[str, str],
-            out_dir: Path) -> List[Path]:
+            out_dir: Path, section_id: Optional[str] = None) -> List[Path]:
     if not isinstance(slug, str) or not SLUG_RE.match(slug):
         raise CompileError(f"invalid --slug {slug!r} (letters, digits and '-')")
     try:
         text = text_file.read_text(encoding='utf-8')
     except OSError as e:
         raise CompileError(f"cannot read --text {text_file}: {e}")
-    payload = compile_compose(bots_dir, name, text, params)
+    payload = compile_compose(bots_dir, name, text, params, section_id)
     if out_dir.exists() and not out_dir.is_dir():
         raise CompileError(f"--out is not a directory: {out_dir}")
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -745,7 +749,7 @@ def main():
     parser.add_argument('--agents-dir', type=Path, default=DEFAULT_AGENTS_DIR,
                         help='Folder of bot folders on the bot computer (for extend; default ~/agent-data/agents)')
     parser.add_argument('--description', help='New description (for update)')
-    parser.add_argument('--section-id', help='Section ID (for create/build)')
+    parser.add_argument('--section-id', help='Section ID (for create/build/compose)')
     parser.add_argument('--config', type=Path, help='Flat JSON config {KEY: value} (same whitelist as --param)')
     parser.add_argument('--param', action='append', help='Placeholder param KEY=value (repeatable, overrides --config)')
     parser.add_argument('--bots', help="Comma-separated bot ids, or 'all' (for build)")
@@ -788,7 +792,8 @@ def main():
         if args.command == 'compose':
             if not args.name or not args.text or not args.slug or not args.out:
                 raise CompileError("compose needs --name, --text, --slug and --out")
-            for path in compose(args.bots_dir, args.name, args.text, args.slug, params, args.out):
+            for path in compose(args.bots_dir, args.name, args.text, args.slug, params, args.out,
+                                 args.section_id):
                 print(path)
             return 0
 

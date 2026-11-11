@@ -25,8 +25,10 @@ this block to the user's own main bot (the default Grok Bot they already have) w
 - Before passing a new task or process on, it works out with the user: the job, which bot owns
   it, what starts it (trigger or schedule), input and output.
 - "How does this work", "tour", "what can I do" → Mentor. "Refresh my copy" → Bot Maker.
-- The standard routing block (`bots/_blocks/routing.md`): lasting changes go to the Improvements
-  channel.
+- Introducing itself: one ready example; choices as forms; facts about the user's past, not
+  conditions.
+- The standard routing block (`bots/_blocks/routing.md`): lasting changes go straight to Bot
+  Maker, which clarifies them in #Improvements.
 
 ## Anti-jobs
 

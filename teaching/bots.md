@@ -26,7 +26,7 @@ Each bot folder contains:
 
 **Via shared data:** Readers write to stats.db, Monitor reads from it.
 
-**Via channels:** the core installs an Improvements channel (you, your main bot and Bot Maker). Any bot that hears a request to change something for good passes it there; Bot Maker clarifies it, shows each change as WHAT / WHERE / WHY and applies it only after your own yes.
+**Via channels:** the core installs the #Improvements channel (you, your main bot and Bot Maker; at most 6 bots fit in a channel). Any bot that hears a request to change something for good sends it straight to Bot Maker; Bot Maker clarifies it there, shows each change as WHAT / WHERE / WHY and applies it only after your own yes.
 
 ## Anti-Jobs
 
@@ -47,7 +47,7 @@ When you need a new bot, check the test:
   → Yes = new bot  
   → No = skill or function in existing bot
 
-Bot Maker creates new bots after your approval, and adds the standard routing block to each of them, so every bot passes lasting changes on to Improvements.
+Bot Maker creates new bots after your approval, and adds the standard routing block to each of them, so every bot passes lasting changes on to Bot Maker.
 
 ---
 

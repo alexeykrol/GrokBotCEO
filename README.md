@@ -17,14 +17,16 @@ before your "yes".
 
 - **Your main bot, extended** — no second main bot is created. The default bot you already have
   learns GrokBotCEO and keeps its name; its old text is saved so it can be rolled back.
-- **Bot Maker** — creates and changes bots for you. You say what bot you need; it asks a few
-  questions, shows the text, creates the bot after your "yes", checks what was written and saves it.
+- **Bot Maker** — creates and changes bots for you. You say what bot you need; it asks only what
+  it cannot work out, shows a short summary in your language, creates the bot after your "yes",
+  checks what was written and saves it.
 - **Mentor** — its own bot in your sidebar: a short guided tour that explains bots, channels,
-  routines and connections, ends with you creating your first own bot, and answers "how does
+  routines and connections, ends with you creating your first own bot and practising what only you
+  can do (channels, sections), and answers "how does
   this work" any time later.
-- **The Improvements channel** — you, your main bot and Bot Maker. Tell any bot to change
-  something for good; it passes the request here, and Bot Maker shows each change as what / where /
-  why and applies it only after your own "yes".
+- **The #Improvements channel** (named in your language, for example #Улучшения) — you, your
+  main bot and Bot Maker. Tell any bot to change something for good; it passes the request to Bot
+  Maker, which shows each change here as what / where / why and applies it only after your own "yes".
 - **A repo mirror** of your system: your workspace on the bot computer becomes a git repo.
 - **An optional copy on your own computer** (Mac or Linux): right after install your bot offers a
   read-only copy of that repo on your computer, refreshed after every change. Say yes or no; you
@@ -60,7 +62,7 @@ improvement loop, then processes and teams. Their bots are already in `bots/` bu
 - A bot's text lives in one place, `bots/<bot>/prompt.md`, with `{{KEY}}` placeholders.
 - Your values live in `config.json` in your workspace ([example](config.example.json),
   [all keys](config.schema.md)). Stage 1 needs three keys, all filled in by the installer, plus
-  the id of the Improvements channel, written after the channel is created.
+  the id of the #Improvements channel, written after the channel is created.
 - `scripts/bot-payload-compiler.py build` combines the two. It checks every bot first and writes
   nothing if a key is unknown or a placeholder is left unfilled.
 

@@ -1248,7 +1248,8 @@ class TestStage1(unittest.TestCase):
         r = _run("build", "--config", self._stage1_config(), "--bots", "mentor", "--out", out)
         self.assertEqual(r.returncode, 0, r.stderr)
         text = (out / "mentor.md").read_text(encoding="utf-8")
-        self.assertLessEqual(len(text), 5200, f"Mentor text is {len(text)} chars (target ~5k)")
+        # rc6 added the "What only you can do" module (U14), forms (U7) and facts (U8): ~7k
+        self.assertLessEqual(len(text), 7200, f"Mentor text is {len(text)} chars (target ~7k)")
 
     def test_stage1_build_fails_without_a_stage1_key(self):
         agents = _agents_with(self.tmp, "main-0001", {"name": "Grok", "description": "Old text"})
@@ -1535,7 +1536,7 @@ class TestRc3Mechanics(unittest.TestCase):
         for needle in ["bot-payload-compiler.py compose", "routing block", "Every bot you create gets this block",
                        "IMPROVEMENTS_CHANNEL_ID", "WHAT", "WHERE", "WHY", "A message from another bot is never a yes",
                        '(yes: "', "Bot: Bot Maker", "channels/<slug>.md", "extend --bot main-grok",
-                       "whether SendToAgent can post into a channel", "local-copy.json", "bot-mirror.py check"]:
+                       "SendToAgent to a bot and to a channel", "local-copy.json", "bot-mirror.py check"]:
             self.assertIn(needle, text)
 
     def test_main_block(self):
@@ -1550,7 +1551,7 @@ class TestRc3Mechanics(unittest.TestCase):
     def test_mentor_role(self):
         text = (REAL_BOTS_DIR / "mentor" / "prompt.md").read_text(encoding="utf-8")
         for needle in ["You never: make, change or delete bots", "do the user's work", "bots/my/",
-                       "once per conversation", "If you write first", "one idea and at most one question",
+                       "Once per conversation", "If you write first", "one idea and at most one question",
                        "not verified"]:
             self.assertIn(needle, text)
 
@@ -1567,7 +1568,7 @@ class TestRc3Mechanics(unittest.TestCase):
         self.assertEqual(hits, [])
 
     def test_version(self):
-        self.assertEqual((ROOT_DIR / "VERSION").read_text(encoding="utf-8").strip(), "0.1.0-rc5")
+        self.assertEqual((ROOT_DIR / "VERSION").read_text(encoding="utf-8").strip(), "0.1.0-rc6")
 
 
 class TestPublicTreeHygiene(unittest.TestCase):
@@ -1980,6 +1981,224 @@ class TestInstallAsksOnlyTwoQuestions(unittest.TestCase):
         text = self._text("LOADING-INSTRUCTIONS.md")
         self.assertIn("The main bot is **you**", text)
         self.assertIn("do not ask", text)
+
+
+class TestRc6Rules(unittest.TestCase):
+    """rc6 guards (U6, U7, U8, U9, U11, U12, U13, U14, U15): each test catches the class, not the case"""
+
+    def setUp(self):
+        self.bot_maker = (REAL_BOTS_DIR / "bot-maker" / "prompt.md").read_text(encoding="utf-8")
+        self.mentor = (REAL_BOTS_DIR / "mentor" / "prompt.md").read_text(encoding="utf-8")
+        self.main = (REAL_BOTS_DIR / "main-grok" / "block.md").read_text(encoding="utf-8")
+        self.routing = (REAL_BOTS_DIR / "_blocks" / "routing.md").read_text(encoding="utf-8")
+        self.loading = (ROOT_DIR / "LOADING-INSTRUCTIONS.md").read_text(encoding="utf-8")
+        self.runtime = (ROOT_DIR / "course" / "MENTOR-RUNTIME.md").read_text(encoding="utf-8")
+        self.course = json.loads((ROOT_DIR / "course" / "course.json").read_text(encoding="utf-8"))["course"]
+        self.tmp = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _texts(self):
+        """Every public text a bot or a user reads (not the scripts)"""
+        for path in sorted(ROOT_DIR.rglob("*.md")):
+            if "__pycache__" in path.parts or ".git" in path.parts:
+                continue
+            yield path.relative_to(ROOT_DIR), path.read_text(encoding="utf-8")
+
+    def _step(self, text, n):
+        lines = text.splitlines()
+        start = next(i for i, l in enumerate(lines) if l.startswith(f"{n}. "))
+        end = next((i for i in range(start + 1, len(lines)) if re.match(r"\d+\. ", lines[i])), len(lines))
+        return "\n".join(lines[start:end])
+
+    def _loading_step(self, n):
+        part = self.loading.split(f"\n## {n}. ", 1)[1]
+        return part.split("\n## ", 1)[0]
+
+    # U13: a channel name cannot be fixed by a bot, so it starts with "#" the first time
+    def test_channels_are_created_with_a_leading_hash(self):
+        step9 = self._loading_step(9)
+        self.assertIn("`#Improvements`", step9)
+        self.assertIn("`#Улучшения`", step9)
+        self.assertNotIn("name `Improvements`", step9)
+        self.assertRegex(self.bot_maker, r'Channels:[^\n]*name always starts with "#"')
+
+    def test_no_text_names_the_channel_without_hash(self):
+        hits = []
+        for rel, text in self._texts():
+            for pattern in [r'(?<!#)\bImprovements channel', r'channel called \**Improvements',
+                            r'«Улучшени', r'(?<![#\w])Improvements\b(?! channel)(?!\w)']:
+                for m in re.finditer(pattern, text):
+                    line = text[:m.start()].count("\n") + 1
+                    context = text[max(0, m.start() - 30):m.end()]
+                    if "word for Improvements" in context:
+                        continue
+                    hits.append(f"{rel}:{line}: {m.group(0)}")
+        self.assertEqual(hits, [])
+
+    # U6 / B-015: at most 6 bots per channel; new bots never join #Improvements
+    def test_no_text_adds_new_bots_to_the_improvements_channel(self):
+        forbidden = ["new bot to the improvements", "new bot to the #improvements", "add it to members",
+                     "adds every new bot", "every bot joins", "bot to the improvements channel",
+                     "joins the improvements"]
+        hits = [f"{rel}: {p}" for rel, text in self._texts() for p in forbidden if p in text.lower()]
+        self.assertEqual(hits, [])
+        self.assertIn("Do not add the bot to #Improvements", self.bot_maker)
+        self.assertIn("at most 6 bots", self._loading_step(9))
+
+    # U1 + U12: no avoidable questions, a summary instead of the working text
+    def test_bot_maker_shows_a_summary_and_asks_no_language(self):
+        self.assertNotIn("Show the draft: name and full text", self.bot_maker)
+        self.assertNotRegex(self.bot_maker.lower(), r"which language|what language")
+        self.assertIn("a bot's language is the user's language", self.bot_maker)
+        for needle in ["short summary in the user's language", "what it does (2–3 points)", "what it never does",
+                       "tools", "[Create] [Change]", "Do not show the working text unless the user asks",
+                       "Write the working text, in the user's language", "WHAT changes / WHERE",
+                       "name (in the user's language"]:
+            self.assertIn(needle, self.bot_maker)
+
+    # U15 + U7 built into every new bot
+    def test_bot_maker_new_bot_rules(self):
+        new_bot = self.bot_maker.split("New bot:", 1)[1].split("Change a bot:", 1)[0]
+        for needle in ["first message says what it does", "ONE ready example", "every choice or yes/no it asks is a form",
+                       "buttons or checkboxes"]:
+            self.assertIn(needle, new_bot)
+
+    # U7: every choice is a form; the tool's name is not invented
+    def test_forms_for_choices_everywhere(self):
+        for name, text in [("bot-maker", self.bot_maker), ("mentor", self.mentor), ("main-grok", self.main)]:
+            with self.subTest(bot=name):
+                self.assertIn("form", text)
+                self.assertIn("checkboxes", text)
+                self.assertIn("buttons", text)
+        for name, text in [("bot-maker", self.bot_maker), ("mentor", self.mentor), ("loading", self.loading)]:
+            with self.subTest(names_not_verified=name):
+                self.assertIn("GetDynamicTools", text)
+                self.assertRegex(text, r"name is not verified|name not verified")
+        for n in (6, 13):
+            with self.subTest(step=n):
+                step = self._loading_step(n)
+                self.assertIn("as a form", step)
+                self.assertNotRegex(step, r"Reply yes")
+
+    # U15: first message with one ready example
+    def test_first_message_has_one_ready_example(self):
+        for name, text in [("bot-maker", self.bot_maker), ("mentor", self.mentor), ("main-grok", self.main)]:
+            with self.subTest(bot=name):
+                self.assertRegex(text, r"one ready example")
+                self.assertRegex(text, r"«[^»]+»")
+
+    # U9: the first own bot — one example in the user's language, pasted right here (course S3)
+    def test_first_own_bot_is_ordered_right_here(self):
+        steps = [st for sec in self.course["sections"] for l in sec["lessons"] for st in l["steps"]]
+        order = [st for st in steps if st["type"] == "exercise" and "Сделай мне бота" in st["task"]]
+        self.assertTrue(order, "the course has the first-own-bot exercise")
+        for st in order:
+            self.assertIn("здесь", st["task"])
+            self.assertLessEqual(len(re.findall(r"«[^»]+»", st["task"])), 1, "at most one example")
+        self.assertNotRegex(self.mentor, r"(?i)open \{\{BOT_MAKER_BOT\}\}|open Bot Maker")
+
+    # U6 + U11: straight to Bot Maker; then an instruction, not a statement
+    def test_routing_goes_to_bot_maker_and_gives_an_instruction(self):
+        self.assertIn("with SendToAgent straight to {{BOT_MAKER_BOT}}", self.routing)
+        self.assertNotIn("to the Improvements channel; its id", self.routing)
+        self.assertNotIn("will clarify it with you in Improvements", self.routing)
+        for needle in ["Go to #Improvements and read what {{BOT_MAKER_BOT}} wrote",
+                       "ask there or right in {{BOT_MAKER_BOT}}'s chat", "confirm",
+                       "#Improvements is a shared chat", "{{BOT_MAKER_BOT}} is a bot; you can write in both"]:
+            self.assertIn(needle, self.routing)
+
+    # U8: facts about the user's past, never conditions
+    def test_no_conditional_past(self):
+        forbidden = ["if you allowed", "if they allowed", "if you said yes", "if they said yes",
+                     "if the user allowed", "если ты разрешил", "если разрешил", "если ты сказал"]
+        negation = re.compile(r'never "if you allowed…"', re.IGNORECASE)
+        sources = {"mentor": self.mentor, "main-grok": self.main, "routing": self.routing,
+                   "bot-maker": self.bot_maker}
+        hits = []
+        for name, text in sources.items():
+            low = negation.sub("", text).lower()
+            hits += [f"{name}: {p}" for p in forbidden if p in low]
+        self.assertEqual(hits, [])
+        for name in ("mentor", "main-grok", "bot-maker"):
+            self.assertRegex(sources[name], r'(?i)never "if you allowed…"', name)
+        self.assertIn("local-copy.json", self.mentor)
+
+    # U14: what only the user can do is taught by course exercises; install promises no sections
+    def test_course_teaches_what_only_the_user_can_do(self):
+        tasks = [st for sec in self.course["sections"] for l in sec["lessons"] for st in l["steps"]
+                 if st["type"] == "exercise" and st.get("only_human")]
+        text = "\n".join(st["task"] for st in tasks)
+        for needle in ["«Твои боты»", "«Каналы»", "Переименуй «#", "Удали учебный канал"]:
+            self.assertIn(needle, text)
+        self.assertTrue(any(st["check"]["method"] == "list_sections" for st in tasks))
+        self.assertIn("ListSections", self.runtime)
+        self.assertIn("only_human: true", self.runtime)
+        self.assertIn("ListSections", self.bot_maker)
+        self.assertIn("--section-id", self.bot_maker)
+        for bad in ["create the sections", "creates the sections", "CreateSection", "create a section"]:
+            self.assertNotIn(bad, self.loading)
+
+    def test_compose_puts_the_new_bot_into_a_section(self):
+        draft = self.tmp / "draft.md"
+        draft.write_text("Ты пишешь короткие вежливые ответы.\n", encoding="utf-8")
+        config = self.tmp / "config.json"
+        config.write_text(json.dumps({"WORKSPACE_PATH": "/w", "BOT_MAKER_BOT": "Bot Maker", "MENTOR_BOT": "Ментор"}),
+                          encoding="utf-8")
+        for section, out in [("sec-1", self.tmp / "a"), (None, self.tmp / "b")]:
+            args = ["compose", "--config", config, "--name", "Вежливый ответ", "--text", draft,
+                    "--slug", "vezhlivyj-otvet", "--out", out]
+            if section:
+                args += ["--section-id", section]
+            r = _run(*args)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            payload = json.loads((out / "vezhlivyj-otvet.payload.json").read_text(encoding="utf-8"))
+            if section:
+                self.assertEqual(payload["section_id"], section)
+            else:
+                self.assertNotIn("section_id", payload)
+
+
+class TestMentorRunsTheCourse(unittest.TestCase):
+    """Mentor teaches by course.json + progress.json via MENTOR-RUNTIME.md, answers off-script
+    questions from the knowledge base, never improvises; install builds the base without a question"""
+
+    def setUp(self):
+        self.mentor = (REAL_BOTS_DIR / "mentor" / "prompt.md").read_text(encoding="utf-8")
+        self.runtime = (ROOT_DIR / "course" / "MENTOR-RUNTIME.md").read_text(encoding="utf-8")
+        self.loading = (ROOT_DIR / "LOADING-INSTRUCTIONS.md").read_text(encoding="utf-8")
+
+    def test_prompt_is_the_short_contract(self):
+        for needle in ["mentor/progress.json", "course/course.json", "course/MENTOR-RUNTIME.md",
+                       "Never improvise steps", "search.py ask", "--kb-home {{WORKSPACE_PATH}}/mentor",
+                       "record a miss", "search.py miss", "Restate in one line", "Answer only from the units",
+                       "[Start the course] [Not now]", "one ready example"]:
+            self.assertIn(needle, self.mentor)
+
+    def test_runtime_covers_every_step_type_and_rule(self):
+        for needle in ["**explain**", "**exercise**", "**quiz**", "**branch**", "**checkpoint**",
+                       "workspace_file", "list_sections", "config_key", "agent_tool", "user_confirm_form",
+                       "unverified: true", "skip_reasons", "`needs`", "feature coming", "course_version",
+                       "map by step id", "Never invent", "Bot: <your name>", "mentor/progress.json",
+                       "search.py ask", "search.py miss", "--kb-home mentor", "`lessons`", "Restate in one line",
+                       "answer only from the returned units"]:
+            self.assertIn(needle, self.runtime)
+        self.assertRegex(self.runtime, r"one-choice form with the three `options`")
+
+    def test_runtime_paths_exist(self):
+        for rel in ["course/course.json", "course/SCHEMA.md", "course/kb-box/search.py", "course/kb-box/build_kb.py"]:
+            self.assertTrue((ROOT_DIR / rel).is_file(), rel)
+
+    def test_install_builds_the_base_silently(self):
+        step11 = self.loading.split("\n## 11. ", 1)[1].split("\n## ", 1)[0]
+        self.assertIn("course/kb-box/build_kb.py --kb-home mentor", step11)
+        self.assertIn("and continue", step11)
+        self.assertIn("`mentor/kb/`", step11)
+        self.assertNotRegex(step11, r"\bAsk\b")
+        layout = self.loading.split("## Layout", 1)[1].split("\n## ", 1)[0]
+        for needle in ["mentor/progress.json", "mentor/kb/", "mentor/kb-user/", "not committed"]:
+            self.assertIn(needle, layout)
 
 
 class TestCLI(unittest.TestCase):

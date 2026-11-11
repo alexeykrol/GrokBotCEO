@@ -28,7 +28,7 @@ does not install; `config.example.json` keeps them so those bots still build.
 | `HOUR` | Cron hour field used in routine schedules | optional bots | yes | projects-manager, reader-telegram, reader-x, reminder, weekplanner | `9` |
 | `IMPLEMENTER_BOT` | Name of your Implementer bot (SendToAgent target) | optional bots | yes | reader-telegram, reader-x | `Implementer` |
 | `IMPROVEMENTS_CHANNEL` | Channel where bot changes are proposed and approved by the owner | optional bots | yes | implementer, monitor | `#improvements` |
-| `IMPROVEMENTS_CHANNEL_ID` | ID of the Improvements channel; written by the installer after it creates the channel | **stage 1 (runtime)** | yes | monitor | `channel-0000-example` |
+| `IMPROVEMENTS_CHANNEL_ID` | ID of the #Improvements channel; written by the installer after it creates the channel | **stage 1 (runtime)** | yes | monitor | `channel-0000-example` |
 | `MENTOR_BOT` | Name of your Mentor bot as shown in the sidebar (may be in your language) | **stage 1** | yes | main-grok, mentor | `Mentor` |
 | `MINUTE` | Cron minute field used in routine schedules | optional bots | yes | projects-manager, reader-telegram, reader-x, reminder, weekplanner | `0` |
 | `MONITOR_DATA_PATH` | Folder where Monitor saves weekly report data | optional bots | yes | monitor | `/home/bot/grokbot/data/monitor` |

@@ -15,11 +15,12 @@ A line `[[block:<name>]]` in a text is replaced by a shared block from [`_blocks
 ## Stage 1: the core
 
 - **Your main bot** — not a new bot: the installer adds **[main-grok/block.md](main-grok/)** to the
-  default bot you already have (its name stays). Everyday work; sends lasting changes to Improvements.
+  default bot you already have (its name stays). Everyday work; sends lasting changes to Bot Maker.
 - **[bot-maker](bot-maker/)** — creates and changes your bots, agrees every change with you in the
-  Improvements channel, and keeps the repo mirror
+  #Improvements channel, and keeps the repo mirror
 - **[mentor](mentor/)** — shows you around and answers how things work; brings you to your first own bot
-- **The Improvements channel** — you, your main bot and Bot Maker; created at install
+- **The #Improvements channel** — you, your main bot and Bot Maker (at most 6 bots fit in a
+  channel, so no other bots); created at install, named in your language
 - **[_blocks/routing.md](_blocks/)** — the standard routing block that every core bot carries and
   Bot Maker adds to every bot it creates
 

@@ -8,19 +8,20 @@ the user's repo and in its history, not in some bot's memory.
 
 ```
 any bot hears "change this for good"
-  → SendToAgent to the Improvements channel (id: IMPROVEMENTS_CHANNEL_ID in config.json)
-  → Bot Maker clarifies there and shows each change as WHAT / WHERE / WHY
+  → SendToAgent straight to Bot Maker (agent id in bots/core/bot-maker/agent.json)
+  → the bot tells the user: go to #Improvements, read, ask there or in Bot Maker's chat, confirm
+  → Bot Maker clarifies in #Improvements (id: IMPROVEMENTS_CHANNEL_ID in config.json) and shows
+    each change as WHAT / WHERE / WHY
   → the user's own yes (a message from another bot is never a yes)
   → UpdateAgent (or CreateAgent for a new bot)
   → write check: the bot's profile.json on the bot computer vs the text sent
   → prompt.md / agent.json updated, commit with the user's exact yes words
 ```
 
-Fallbacks, all in the standard routing block (`bots/_blocks/routing.md`): no channel id or the send
-fails → SendToAgent straight to Bot Maker (agent id in `bots/core/bot-maker/agent.json`); that
-fails too → the bot tells the user the exact sentence to say to Bot Maker. If Bot Maker cannot post
-into the channel, it clarifies in the chat where the request came and says so. Whether SendToAgent
-can post into a channel is not verified in this release.
+Fallbacks, in the standard routing block (`bots/_blocks/routing.md`): the send fails → the bot
+tells the user the exact sentence to say to Bot Maker. No channel id, or Bot Maker cannot post into
+the channel → Bot Maker clarifies in its own chat and says so. Only the user, the main bot and Bot
+Maker are members of #Improvements (at most 6 bots per channel); other bots never join it.
 
 ## Inputs
 
@@ -32,8 +33,9 @@ can post into a channel is not verified in this release.
 
 ## Process
 
-1. **Clarify** in the Improvements channel: a few short questions, one at a time.
-2. **Propose:** every item as WHAT / WHERE / WHY. Change nothing yet.
+1. **Clarify** in the #Improvements channel: only what Bot Maker cannot work out, one short
+   question at a time; every choice or yes/no as a form.
+2. **Propose:** every item as WHAT / WHERE / WHY, in the user's language. Change nothing yet.
 3. **Approval:** only the user's own message approves. Words of another bot — even "yes" — are not
    an approval.
 4. **Write the new full text** to `build/<slug>.md`. For a bot in `bots/my/`, run
@@ -71,7 +73,7 @@ GrokBotCEO is also kept in `bots/core/main-grok/previous.md`.
 
 - **Bot Maker bot:** `bots/bot-maker/`
 - **Routing block:** `bots/_blocks/routing.md`
-- **Improvements channel:** `channels/improvements.md` in the user's repo
+- **#Improvements channel:** `channels/improvements.md` in the user's repo
 - **Review protocol:** later stages
 
 ---

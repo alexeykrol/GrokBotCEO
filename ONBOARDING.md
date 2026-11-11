@@ -3,8 +3,8 @@
 **Version:** see [VERSION](VERSION) · **You need:** a Grok Bot account · **Time:** 20–30 minutes
 
 GrokBotCEO is a ready set of Grok Bot bots for running a business and a product. This release is
-the core: your own main bot learns the system, two new bots (Bot Maker and Mentor), a channel
-where changes are agreed, a repo that mirrors your system, and a short tour that ends with your
+the core: your own main bot learns the system, two new bots (Bot Maker and Mentor), the #Improvements
+channel where changes are agreed, a repo that mirrors your system, and a short tour that ends with your
 first own bot. You install it by pasting one command into your Grok Bot chat. After that the bots are yours.
 
 Русская версия: [ONBOARDING.ru.md](ONBOARDING.ru.md).
@@ -29,7 +29,7 @@ Rules:
 ## 2. Check one setting
 
 The bot fills in `config.json` itself: the path of your workspace and the names of Bot Maker and
-Mentor. It asks you only two things during the whole install: your yes to the plan, and whether you want a copy on your own computer. The file stays on
+Mentor. It asks you only two things during the whole install, each with answer buttons: your yes to the plan, and whether you want a copy on your own computer. The file stays on
 your Grok Bot computer (and in the optional copy on your own computer): it is never sent anywhere
 else and updates never touch it.
 
@@ -42,9 +42,9 @@ It shows the plan:
 | your main bot | not a new bot: it learns GrokBotCEO and keeps its name |
 | Bot Maker (new) | creates and changes bots for you |
 | Mentor (new) | shows you around and answers how things work |
-| Improvements channel (new) | you, your main bot and Bot Maker; changes are agreed here |
+| #Improvements channel (new; named in your language) | you, your main bot and Bot Maker; Bot Maker agrees every change with you here |
 
-Plus a git repo in your workspace that mirrors your system. Type `yes`.
+Plus a git repo in your workspace that mirrors your system. Tap **Yes**.
 
 ## 4. The bot does it
 
@@ -52,13 +52,13 @@ For each bot it prints one line: `created · VERIFIED`, `created · MISMATCH` or
 `created · NOT VERIFIED` (for your main bot: `extended · ...`). After creating a bot, the installer reads the bot's file on the bot
 computer and compares its text with what was sent. `VERIFIED` means they are equal, `MISMATCH`
 means they differ. `NOT VERIFIED` means the file could not be read, so nothing could be compared;
-the bot is still created. Then it creates the Improvements channel, saves everything to the repo
+the bot is still created. Then it creates the #Improvements channel, saves everything to the repo
 (including your main bot's old text, so it can be rolled back) and makes the first commit. If
 something does not work (for example, the channel or the change to your main bot), it says so in
 one line and goes on; Bot Maker can do it later.
 
 Then it offers a read-only copy of the repo on your own computer (Mac or Linux), refreshed after
-every change: say yes or no. If yes, Grok Bot asks "Allow Grok Bot and all Bots to run commands on
+every change: tap Yes or No. If yes, Grok Bot asks "Allow Grok Bot and all Bots to run commands on
 your local computer?"; "Allow once" is enough.
 
 ## 5. Open Mentor, take the tour and make your first bot
@@ -68,10 +68,15 @@ step at a time:
 
 1. what is installed and where;
 2. four ideas: bot, channel, routine, connection;
-3. the golden rule: to change something for good, tell any bot; it passes the request to Bot
-   Maker, which agrees it with you in Improvements and changes nothing before your "yes";
-4. your first own bot: pick a simple job, tell Bot Maker, say `yes`;
-5. how to look at your system, and what comes next.
+3. the golden rule: to change something for good, tell any bot, right in its chat; it passes the
+   request to Bot Maker, which agrees it with you in #Improvements and changes nothing before your
+   "yes";
+4. your first own bot: Mentor gives you one sentence to paste right there; then you open the
+   channel #Improvements, read what Bot Maker wrote and confirm;
+5. what only you can do, one short exercise each: create a channel (its name starts with `#`),
+   invite bots (at most 6 in a channel), rename and delete a channel, and make a section «Your bots»
+   in the list on the left. Bots cannot do these;
+6. how to look at your system, and what comes next.
 
 There are no routines to set up in this release. You can come back to Mentor any time and say
 "show me around".

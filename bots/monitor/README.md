@@ -32,7 +32,7 @@ Monitor does NOT:
 
 1. **Timezone:** Replace `{{OWNER_TIMEZONE}}` with your actual timezone
 2. **Report schedule:** Adjust weekly report time to your preference
-3. **Improvements channel:** Replace `{{IMPROVEMENTS_CHANNEL}}` placeholder
+3. **#Improvements channel:** Replace `{{IMPROVEMENTS_CHANNEL}}` placeholder
 4. **Data paths:** Replace `{{MONITOR_DATA_PATH}}` and `{{WORKSPACE_PATH}}` with your actual paths
 5. **Language:** Template uses Russian; adapt to your language
 

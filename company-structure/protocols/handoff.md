@@ -18,8 +18,8 @@ Every handoff message must include:
 HANDOFF from=<sending-bot> to=<receiving-bot> item=<link-or-id> why=<1-phrase-reason> done=<completion-criterion> deadline=<date-or-none> approval=<yes-or-no>
 ```
 
-**Example** (the main bot passes a lasting change on to the Improvements channel, where Bot Maker
-picks it up):
+**Example** (the main bot passes a lasting change straight to Bot Maker, which clarifies it in
+the #Improvements channel):
 ```
 HANDOFF from=Main-bot to=Bot-Maker item=improvements-channel why=lasting-rule-for-a-bot done=change-committed-after-users-yes deadline=— approval=yes
 ```
@@ -52,7 +52,7 @@ Beyond HANDOFF line, include:
 - What receiving bot should NOT do (if not obvious)
 - Expected outcome format
 
-**Good example** (sent with SendToAgent to the Improvements channel):
+**Good example** (sent with SendToAgent straight to Bot Maker):
 ```
 HANDOFF from=Main-bot to=Bot-Maker item=improvements-channel why=new-routine-needs-an-owner-bot done=bot-created-and-committed-after-users-yes deadline=— approval=yes
 
