@@ -1568,7 +1568,7 @@ class TestRc3Mechanics(unittest.TestCase):
         self.assertEqual(hits, [])
 
     def test_version(self):
-        self.assertEqual((ROOT_DIR / "VERSION").read_text(encoding="utf-8").strip(), "0.1.0-rc6")
+        self.assertEqual((ROOT_DIR / "VERSION").read_text(encoding="utf-8").strip(), "0.1.0-rc7")
 
 
 class TestPublicTreeHygiene(unittest.TestCase):
@@ -2180,14 +2180,17 @@ class TestMentorRunsTheCourse(unittest.TestCase):
         for needle in ["**explain**", "**exercise**", "**quiz**", "**branch**", "**checkpoint**",
                        "workspace_file", "list_sections", "config_key", "agent_tool", "user_confirm_form",
                        "unverified: true", "skip_reasons", "`needs`", "feature coming", "course_version",
-                       "map by step id", "Never invent", "Bot: <your name>", "mentor/progress.json",
+                       "P migrate --json", "grokbotceo/course/progress.py", "never write `mentor/progress.json` yourself",
+                       "P open", "--said-done", "--artifact-ref", "scoring: false", "never delete the lock",
+                       "Never invent", "Bot: <your name>", "mentor/progress.json",
                        "search.py ask", "search.py miss", "--kb-home mentor", "`lessons`", "Restate in one line",
                        "answer only from the returned units"]:
             self.assertIn(needle, self.runtime)
         self.assertRegex(self.runtime, r"one-choice form with the three `options`")
 
     def test_runtime_paths_exist(self):
-        for rel in ["course/course.json", "course/SCHEMA.md", "course/kb-box/search.py", "course/kb-box/build_kb.py"]:
+        for rel in ["course/course.json", "course/SCHEMA.md", "course/kb-box/search.py", "course/kb-box/build_kb.py",
+                    "course/progress.py"]:
             self.assertTrue((ROOT_DIR / rel).is_file(), rel)
 
     def test_install_builds_the_base_silently(self):

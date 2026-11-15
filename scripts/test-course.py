@@ -8,6 +8,7 @@ produce none (GREEN); small broken fixtures prove each check catches its defect 
 Stdlib only, no network.
 """
 import copy
+import importlib.util
 import json
 import re
 import sys
@@ -75,6 +76,13 @@ def user_facing_strings(course):
             for key in ("text", "reaction", "label"):
                 if isinstance(opt.get(key), str):
                     yield f"{step['id']}.{opt.get('id')}.{key}", opt[key]
+        for sit in step.get("situations") or []:
+            if isinstance(sit.get("question"), str):
+                yield f"{sit.get('id')}.question", sit["question"]
+            for opt in sit.get("options", []):
+                for key in ("text", "reaction"):
+                    if isinstance(opt.get(key), str):
+                        yield f"{sit.get('id')}.{opt.get('id')}.{key}", opt[key]
 
 
 # ---------- checks ----------
@@ -333,9 +341,122 @@ def check_kb(kb_dir=KB_DIR):
     return errors
 
 
+def check_dialog_tree(course):
+    """Walk the dialog tree over every answer: every step is reachable from the start,
+    and from every step every path can still reach the finish (no dead ends, no traps).
+    A wrong quiz answer is a short loop back to the same question, so it is not an edge."""
+    sections = course["course"]["sections"]
+    order = [s["id"] for _, _, s in iter_steps(course)]
+    steps = {s["id"]: s for _, _, s in iter_steps(course)}
+    first_of = {sec["id"]: sec["lessons"][0]["steps"][0]["id"]
+                for sec in sections if sec.get("lessons") and sec["lessons"][0].get("steps")}
+    errors, edges = [], {}
+    for i, sid in enumerate(order):
+        s = steps[sid]
+        follow = s.get("next") or (order[i + 1] if i + 1 < len(order) else "finish")
+        if s["type"] == "branch":
+            out = [c.get("next") for c in s.get("cases", [])] + [s.get("default")]
+        elif s["type"] == "checkpoint":
+            out = []
+            resume = next((o.get("target") for o in s.get("options", []) if o.get("target")), None)
+            for o in s.get("options", []):
+                # pause has no target: after the break the user resumes where continue leads
+                tgt = o.get("target") or resume
+                out.append("finish" if tgt == "finish" else first_of.get(tgt, f"?{tgt}"))
+        else:
+            out = [follow]
+        for o in out:
+            if o != "finish" and o not in steps:
+                errors.append(f"{sid}: leads to unknown step {o!r}")
+        edges[sid] = [o for o in out if o == "finish" or o in steps]
+    if not order:
+        return ["course has no steps"]
+    seen, stack = set(), [order[0]]
+    while stack:
+        n = stack.pop()
+        if n in seen or n == "finish":
+            continue
+        seen.add(n)
+        stack.extend(edges.get(n, []))
+    errors += [f"{sid}: unreachable from the start" for sid in order if sid not in seen]
+    rev = {}
+    for a, outs in edges.items():
+        for b in outs:
+            rev.setdefault(b, []).append(a)
+    ok, stack = set(), ["finish"]
+    while stack:
+        n = stack.pop()
+        for a in rev.get(n, []):
+            if a not in ok:
+                ok.add(a)
+                stack.append(a)
+    errors += [f"{sid}: no path to the finish (dead end or trap)" for sid in order if sid not in ok]
+    return errors
+
+
+def check_situations(course):
+    """P2b §2: situation ids unique in the course; option ids unique in a step over all its situations;
+    3 options, one correct, non-empty texts and reactions; rubric_ref '-' or an existing rubric; a scored
+    (eligible) check rests only on verified claims or normative with an accepted rubric."""
+    errors, seen = [], {}
+    rubrics = course["course"].get("rubrics", {})
+    for _, _, step in iter_steps(course):
+        if step["type"] != "quiz":
+            if "situations" in step or "primary_scenario_id" in step:
+                errors.append(f"{step['id']}: situations only on quiz steps")
+            continue
+        sits = step.get("situations") or []
+        ids = [step.get("primary_scenario_id") or step["id"]] + [x.get("id") for x in sits]
+        for i in ids:
+            if i in seen:
+                errors.append(f"{step['id']}: situation id {i} already used by {seen[i]}")
+            seen[i] = step["id"]
+        opt_ids = [o.get("id") for o in step.get("options", [])]
+        for x in sits:
+            where = f"{step['id']}/{x.get('id')}"
+            opts = x.get("options", [])
+            if not str(x.get("question", "")).strip():
+                errors.append(f"{where}: empty question")
+            if len(opts) != 3:
+                errors.append(f"{where}: {len(opts)} options, need exactly 3")
+            if sum(1 for o in opts if o.get("correct") is True) != 1:
+                errors.append(f"{where}: need exactly one correct option")
+            for o in opts:
+                for key in ("id", "text", "reaction"):
+                    if not str(o.get(key, "")).strip():
+                        errors.append(f"{where}.{o.get('id')}: empty {key}")
+            opt_ids += [o.get("id") for o in opts]
+            ref = x.get("rubric_ref", "-")
+            if ref != "-" and ref not in rubrics:
+                errors.append(f"{where}: rubric_ref {ref} does not exist")
+        if len(set(opt_ids)) != len(opt_ids):
+            errors.append(f"{step['id']}: option ids repeat across its situations")
+        built = [sc.get("id") for sc in step.get("scenarios", [])]
+        if built and built != ids:
+            errors.append(f"{step['id']}: scenarios {built} do not follow the situations {ids}")
+    for _, _, step in iter_steps(course):
+        if step["type"] in ("quiz", "exercise") and step.get("eligible"):
+            ok_claims = step.get("basis") == "claims" and step.get("claims_status") == "verified"
+            rub = rubrics.get(step.get("rubric_ref", "-")) or {}
+            ok_norm = step.get("basis") == "normative" and rub.get("status") == "accepted"
+            if not (ok_claims or ok_norm):
+                errors.append(f"{step['id']}: eligible without verified claims or an accepted normative rubric")
+    return errors
+
+
+def balance_lint(course):
+    """Warnings only (P2b §5, §8): position share outside [0.25; 0.42], runs of 3, correct = strictly
+    the longest above 0.5. Implemented in scripts/quiz-balance.py."""
+    path = SCRIPT_DIR / "quiz-balance.py"
+    spec = importlib.util.spec_from_file_location("quiz_balance_lint", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.lint(course["course"])
+
+
 ALL_CHECKS = (check_structure, check_unique_ids, check_lesson_texts, check_competencies,
               check_explains, check_quizzes, check_exercises, check_checkpoints,
-              check_references, check_beginner_language)
+              check_references, check_beginner_language, check_dialog_tree)
 
 
 # ---------- GREEN: the real course ----------
@@ -372,6 +493,9 @@ class TestRealCourse(unittest.TestCase):
     def test_quiz_three_options_one_correct(self):
         self.assertClean(check_quizzes(self.course))
 
+    def test_dialog_tree_every_path_reaches_finish(self):
+        self.assertClean(check_dialog_tree(self.course))
+
     def test_exercises(self):
         self.assertClean(check_exercises(self.course))
 
@@ -387,6 +511,19 @@ class TestRealCourse(unittest.TestCase):
     def test_kb_front_matter(self):
         self.assertClean(check_kb())
 
+    def test_situations(self):
+        self.assertClean(check_situations(self.course))
+
+    def test_balance_lint_warnings_only(self):
+        warnings, numbers = balance_lint(self.course)
+        # a warning, never a failure: printed for the reader with both denominators
+        print(f"\n  balance lint: {len(warnings)} warnings; all situations {numbers['all']['n']} "
+              f"{numbers['all']['counts']}, primaries {numbers['primaries']['n']} {numbers['primaries']['counts']}; "
+              f"strictly longest {numbers['all']['longest']}, ties {numbers['all']['tie']}", file=sys.stderr)
+        for w in warnings[:5]:
+            print(f"  warning: {w}", file=sys.stderr)
+        self.assertIsInstance(warnings, list)
+
 
 # ---------- RED: each check catches its defect ----------
 
@@ -400,6 +537,20 @@ class TestChecksCatchDefects(unittest.TestCase):
 
     def find(self, course, type_):
         return next(s for _, _, s in iter_steps(course) if s["type"] == type_)
+
+    def test_dialog_tree_trap(self):
+        c = self.mutate()
+        b = self.find(c, "branch")
+        b["default"] = b["id"]
+        for case in b.get("cases", []):
+            case["next"] = b["id"]
+        self.assertTrue(check_dialog_tree(c))
+
+    def test_dialog_tree_unreachable(self):
+        c = self.mutate()
+        steps = c["course"]["sections"][0]["lessons"][0]["steps"]
+        steps[0]["next"] = "finish"
+        self.assertTrue(check_dialog_tree(c))
 
     def test_duplicate_id(self):
         c = self.mutate()
@@ -475,6 +626,48 @@ class TestChecksCatchDefects(unittest.TestCase):
         c = self.mutate()
         self.find(c, "explain")["example"] = "Зайди в #Улучшения и подтверди — короткий репортаж"
         self.assertEqual(check_beginner_language(c, lessons_dir=Path("/nonexistent")), [])
+
+    def situation_course(self):
+        c = self.mutate()
+        q = self.find(c, "quiz")
+        q["situations"] = [{"id": q["id"] + ".b", "question": "q2", "rubric_ref": "-",
+                            "options": [{"id": f"p{i}", "text": f"t{i}", "correct": i == 2, "reaction": "r"}
+                                        for i in (1, 2, 3)]}]
+        q["scenarios"] = [{"id": q["id"]}, {"id": q["id"] + ".b"}]
+        return c, q
+
+    def test_situations_good_fixture_passes(self):
+        c, _ = self.situation_course()
+        self.assertEqual(check_situations(c), [])
+
+    def test_situation_option_id_reused(self):
+        c, q = self.situation_course()
+        q["situations"][0]["options"][0]["id"] = q["options"][0]["id"]
+        self.assertTrue(check_situations(c))
+
+    def test_situation_id_reused(self):
+        c, q = self.situation_course()
+        q["situations"][0]["id"] = q["id"]
+        self.assertTrue(check_situations(c))
+
+    def test_situation_two_correct_or_empty_reaction(self):
+        c, q = self.situation_course()
+        q["situations"][0]["options"][0]["correct"] = True
+        self.assertTrue(check_situations(c))
+        c, q = self.situation_course()
+        q["situations"][0]["options"][1]["reaction"] = ""
+        self.assertTrue(check_situations(c))
+
+    def test_situation_unknown_rubric(self):
+        c, q = self.situation_course()
+        q["situations"][0]["rubric_ref"] = "R-none"
+        self.assertTrue(check_situations(c))
+
+    def test_eligible_without_accepted_rubric(self):
+        c = self.mutate()
+        q = self.find(c, "quiz")
+        q.update(eligible=True, basis="unmapped")
+        self.assertTrue(check_situations(c))
 
     def test_kb_front_matter_parser(self):
         self.assertIsNone(parse_front_matter("no front matter"))

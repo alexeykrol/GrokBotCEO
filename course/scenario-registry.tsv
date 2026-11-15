@@ -1,0 +1,85 @@
+# Scenario registry (P2b): append-only, never edit or delete a row. Written by course-merge.py.
+# scenario_id -> (step, answer_version); an id seen with another step or answer_version fails the build.
+# Init sources: 0.1.0 = ea17f9e; 0.2.0 = a06537d; unavailable: none
+# Other commits of course.json read (not releases, no rows): 9ba501f (0.2.0), 7624096 (0.2.0), 1e8caf0 (0.2.0), ec3d105 (0.2.0), 8133629 (0.2.0), fec2379 (0.1.0), 49ad757 (0.1.0)
+scenario_id	step	answer_version	first_course_version	note
+S1.L01.s03	S1.L01.s03	75c7e2e6d7a56908	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L02.s04	S1.L02.s04	88a3bc81ed07aaea	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L02.s06	S1.L02.s06	683712df3c77544b	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L03.s05	S1.L03.s05	38b29b083e33b8ad	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L04.s02	S1.L04.s02	0aca36785ff7f759	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L05.s04	S1.L05.s04	694c33a21a67f88c	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L06.s03	S1.L06.s03	dbdbcdca08730e58	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L06.s06	S1.L06.s06	23f48e6ac51a8f55	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L07.s04	S1.L07.s04	0c9a93cd06d4794d	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L08.s02	S1.L08.s02	fa7c2b3dcec67efc	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L08.s07	S1.L08.s07	2095ceaf89fba4c9	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L09.s06	S1.L09.s06	c51f8b59e08a7fe9	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L10.s04	S1.L10.s04	5942a23e019db457	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L11.s03	S1.L11.s03	4db71a3a9ea8cb3c	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L12.s04	S1.L12.s04	588cbc5cf508911b	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L13.s03	S1.L13.s03	9097c9c66ccf2830	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L14.s04	S1.L14.s04	d581037bf886a45e	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L15.s03	S1.L15.s03	c85730f569aeb7be	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L16.s06	S1.L16.s06	25d132202e02cefb	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L17.s02	S1.L17.s02	6ec2da214e98a849	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L18.s05	S1.L18.s05	83bf118c1fc26dc8	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L19.s04	S1.L19.s04	998b8fdaa7481eb0	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L20.s04	S1.L20.s04	166e4ad846792e8d	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L21.s05	S1.L21.s05	2700534bd0493309	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L22.s05	S1.L22.s05	bde012abd0cb84b7	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L23.s03	S1.L23.s03	1011427c73564c95	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L24.s03	S1.L24.s03	d465300c0c976f73	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L25.s04	S1.L25.s04	4fa986aca5127abe	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L26.s05	S1.L26.s05	31f29e2337a86219	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L27.s04	S1.L27.s04	2c9e4bc3b49a5250	0.1.0	init from 0.1.0 (ea17f9e)
+S2.L01.s04	S2.L01.s04	07d5930d1ee3e214	0.1.0	init from 0.1.0 (ea17f9e)
+S2.L02.s03	S2.L02.s03	ba5490ce5b0585ce	0.1.0	init from 0.1.0 (ea17f9e)
+S2.L03.s04	S2.L03.s04	7945852fb069f18f	0.1.0	init from 0.1.0 (ea17f9e)
+S2.L04.s03	S2.L04.s03	9196f74fec1ddc8a	0.1.0	init from 0.1.0 (ea17f9e)
+S2.L04.s06	S2.L04.s06	4a6885055e11eb7b	0.1.0	init from 0.1.0 (ea17f9e)
+S2.L05.s02	S2.L05.s02	e5bc99976a0733aa	0.1.0	init from 0.1.0 (ea17f9e)
+S2.L06.s06	S2.L06.s06	3aec58e290e82b0d	0.1.0	init from 0.1.0 (ea17f9e)
+S2.L07.s03	S2.L07.s03	ac930c8dea8a9c8f	0.1.0	init from 0.1.0 (ea17f9e)
+S2.L07.s05	S2.L07.s05	f5af63a3c4ed0fd4	0.1.0	init from 0.1.0 (ea17f9e)
+S2.L08.s06	S2.L08.s06	25a37ac905ca3212	0.1.0	init from 0.1.0 (ea17f9e)
+S3.L01.s02	S3.L01.s02	c59b6f3a1982c9d9	0.1.0	init from 0.1.0 (ea17f9e)
+S3.L01.s07	S3.L01.s07	7f81895037bb1b75	0.1.0	init from 0.1.0 (ea17f9e)
+S3.L02.s06	S3.L02.s06	93ff718b2057ac22	0.1.0	init from 0.1.0 (ea17f9e)
+S3.L03.s06	S3.L03.s06	3e850b2d6126ceab	0.1.0	init from 0.1.0 (ea17f9e)
+S3.L04.s02	S3.L04.s02	3028be059b16ee2a	0.1.0	init from 0.1.0 (ea17f9e)
+S3.L05.s02	S3.L05.s02	c2cdf828314d9e0b	0.1.0	init from 0.1.0 (ea17f9e)
+S3.L06.s02	S3.L06.s02	262d9ff6d58b0d36	0.1.0	init from 0.1.0 (ea17f9e)
+S4.L01.s03	S4.L01.s03	beae72549d19d586	0.1.0	init from 0.1.0 (ea17f9e)
+S4.L01.s07	S4.L01.s07	0e50b101d97dea7a	0.1.0	init from 0.1.0 (ea17f9e)
+S4.L02.s02	S4.L02.s02	e3629c258dac1b9e	0.1.0	init from 0.1.0 (ea17f9e)
+S4.L02.s04	S4.L02.s04	9d4faae7a87347df	0.1.0	init from 0.1.0 (ea17f9e)
+S4.L03.s04	S4.L03.s04	e4bd89e033cdc6c5	0.1.0	init from 0.1.0 (ea17f9e)
+S4.L04.s03	S4.L04.s03	dfcf88276335cb3c	0.1.0	init from 0.1.0 (ea17f9e)
+S4.L05.s05	S4.L05.s05	de7488286b14e95a	0.1.0	init from 0.1.0 (ea17f9e)
+S4.L06.s06	S4.L06.s06	73f338bcbcefeb8b	0.1.0	init from 0.1.0 (ea17f9e)
+S4.L07.s02	S4.L07.s02	c64bf1f070e7cc9f	0.1.0	init from 0.1.0 (ea17f9e)
+S4.L08.s06	S4.L08.s06	8dd59aae6347122f	0.1.0	init from 0.1.0 (ea17f9e)
+S4.L09.s02	S4.L09.s02	e2dfb1517695fb1d	0.1.0	init from 0.1.0 (ea17f9e)
+S4.L10.s02	S4.L10.s02	9f2236857c38c559	0.1.0	init from 0.1.0 (ea17f9e)
+S4.L10.s04	S4.L10.s04	6b70087d55ab1710	0.1.0	init from 0.1.0 (ea17f9e)
+S4.L11.s05	S4.L11.s05	5ee691988d56a417	0.1.0	init from 0.1.0 (ea17f9e)
+S4.L12.s05	S4.L12.s05	57ac6fc1d4ca35d3	0.1.0	init from 0.1.0 (ea17f9e)
+S1.L14.s13	S1.L14.s13	b7dd5f73b58ce31c	0.2.0	init from 0.2.0 (a06537d)
+S1.L02.s04.v2	S1.L02.s04	8a935a05d3114c88	0.3.0	added by build
+S1.L02.s06.v2	S1.L02.s06	ec4345006154ab7b	0.3.0	added by build
+S1.L12.s04.v2	S1.L12.s04	6f2a1184b5e1e48e	0.3.0	added by build
+S1.L13.s03.v2	S1.L13.s03	8242d99d2ad31253	0.3.0	added by build
+S1.L14.s13.b	S1.L14.s13	21061b592c78f0b4	0.3.0	added by build
+S1.L16.s06.v2	S1.L16.s06	80ff1d38b2cd47f5	0.3.0	added by build
+S1.L22.s05.v2	S1.L22.s05	948bcd67a435aca8	0.3.0	added by build
+S2.L02.s03.v2	S2.L02.s03	e22c01ca8b16e5b8	0.3.0	added by build
+S2.L04.s03.v2	S2.L04.s03	dabbb739562b3564	0.3.0	added by build
+S3.L01.s02.v2	S3.L01.s02	e13a93eef798349f	0.3.0	added by build
+S3.L01.s07.v2	S3.L01.s07	f1665ce9d9aff8fa	0.3.0	added by build
+S3.L04.s02.v2	S3.L04.s02	9e5be51df0afef58	0.3.0	added by build
+S4.L01.s07.v2	S4.L01.s07	f1ccdf61a1bae963	0.3.0	added by build
+S4.L02.s02.v2	S4.L02.s02	98940b4af91db67e	0.3.0	added by build
+S4.L06.s06.v2	S4.L06.s06	5cf1a1458cdbfc50	0.3.0	added by build
+S4.L08.s06.v2	S4.L08.s06	e79c37544bb63cab	0.3.0	added by build
+S4.L12.s05.v2	S4.L12.s05	50854523001d454b	0.3.0	added by build

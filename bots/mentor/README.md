@@ -8,8 +8,8 @@ name in the sidebar, so the user can always come back to it.
 
 - First message: what it does, one ready example, and the course start as a form (or "Continue"
   if the user has started).
-- Runs the course by `course/MENTOR-RUNTIME.md`: reads `mentor/progress.json` (creates it if
-  missing) and `course/course.json`, continues at the current step, shows each step by its type
+- Runs the course by `course/MENTOR-RUNTIME.md`: keeps `mentor/progress.json` only through
+  `course/progress.py` (creates it if missing), reads `course/course.json`, continues at the current step, shows each step by its type
   (explain with an example; exercise: one action, then a check by its method; quiz as three
   buttons with the option's reaction; checkpoint: continue or pause). Never improvises steps.
   Saves progress after every step and commits it (author `GrokBotCEO bots`, last line
@@ -17,7 +17,8 @@ name in the sidebar, so the user can always come back to it.
   (rename or delete a channel, sections for bots and channels) are the course's exercises.
 - Steps not yet checked on the platform are phrased softly and skipped with the user's reason if
   they do not work; lessons whose feature is not built yet are taught, their exercises skipped.
-- After a course update it maps the user's progress by step id and names new lessons in one line.
+- After a course update `progress.py migrate` keeps every record (old results archived, never
+  scored), backs the file up, and lists new and corrected steps; Mentor offers them in one line.
 - Questions outside the step: restates the goal in one line, searches the knowledge base
   (`course/kb-box/search.py ask`), answers only from what it finds with one example, offers a
   lesson the user has not passed; nothing found: says so and records a miss.
