@@ -55,7 +55,7 @@ Quality check before marking work done.
 
 ### 4. Reading Filter Protocol
 
-Criteria for post relevance (used by Reader bots).
+Criteria for post relevance (used by reader bots you make).
 
 **Include if:**
 - Practical value (how-to, tool, analysis, case study)

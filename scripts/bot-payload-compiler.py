@@ -70,49 +70,21 @@ BOT_ID_RE = re.compile(r'^[a-z0-9][a-z0-9-]*$')
 # Placeholder keys: the single source of truth for the whitelist, the meaning of each key
 # and a fictional example value (used to generate config.example.json / config.schema.md).
 KEY_DOCS: Dict[str, Tuple[str, str]] = {
-    "ANALYSIS_DATA_PATH": ("Folder where Repository Analyst stores analysis results", "/home/bot/grokbot/data/analysis"),
     "BOT_MAKER_BOT": ("Name of your Bot Maker bot (SendToAgent target)", "Bot Maker"),
-    "CVE_NAG_INTERVAL": ("How often Reminder nags about an open CVE", "every 2 hours"),
-    "CVE_PACKAGES": ("Packages whose CVE notifications Reminder tracks", "openssl, example-lib"),
-    "DAY_OF_WEEK": ("Cron day-of-week field for the weekly Projects Manager routine", "1"),
-    "HOUR": ("Cron hour field used in routine schedules", "9"),
-    "IMPLEMENTER_BOT": ("Name of your Implementer bot (SendToAgent target)", "Implementer"),
-    "IMPROVEMENTS_CHANNEL": ("Channel where bot changes are proposed and approved by the owner", "#improvements"),
     "IMPROVEMENTS_CHANNEL_ID": ("ID of the #Improvements channel; written by the installer after it creates the channel", "channel-0000-example"),
     "MENTOR_BOT": ("Name of your Mentor bot as shown in the sidebar (may be in your language)", "Mentor"),
-    "MINUTE": ("Cron minute field used in routine schedules", "0"),
-    "MONITOR_DATA_PATH": ("Folder where Monitor saves weekly report data", "/home/bot/grokbot/data/monitor"),
-    "NOTION_PROJECT_DATABASE": ("Notion database that Projects Manager reads", "https://www.notion.so/example-workspace/0000000000000000"),
-    "OUTPUT_LANGUAGE": ("Language Reader X answers in when the owner writes in it", "English"),
-    "OWNER_TIMEZONE": ("Owner timezone (IANA name) for schedules and report periods", "Europe/Berlin"),
-    "PLANNING_DATA_PATH": ("Folder where Weekplanner stores weekly plans", "/home/bot/grokbot/data/planning"),
-    "PROJECT_TRACKING_PATH": ("Folder for Projects Manager local tracking", "/home/bot/grokbot/data/projects"),
-    "PUBLISHING_CHANNEL": ("Channel where Translator posts approved translations", "@example_channel"),
-    "READER_X_BOT": ("Name of your Reader X bot (SendToAgent target)", "Reader X"),
-    "READING_DATA_PATH": ("Folder for reader state and stats (state.json, stats.db)", "/home/bot/grokbot/reading-data"),
-    "READING_FILTER_PATH": ("File with the shared reading filter criteria", "/home/bot/grokbot/company-structure/protocols/reading-filter.md"),
-    "READING_ROUTINE_NAME": ("Name of the daily reading routine", "daily-reading"),
-    "REMINDER_BOT": ("Name of your Reminder bot (SendToAgent target)", "Reminder"),
-    "REMINDER_DATA_PATH": ("Folder where Reminder stores tasks", "/home/bot/grokbot/data/reminders"),
-    "REPORT_LANGUAGE": ("Language of Monitor reports", "English"),
-    "REPOSITORY_ANALYST_BOT": ("Name of your Repository Analyst bot (SendToAgent target)", "Repository Analyst"),
-    "TASK_MANAGER_BOT": ("Name of your Task Manager bot (SendToAgent target)", "Task Manager"),
-    "TRANSLATOR_BOT": ("Name of your Translator bot", "Translator"),
-    "VIDEO_PROJECT_PATH": ("Folder for Director video projects", "/home/bot/grokbot/videos"),
-    "WEEKLY_REPORT_DAY": ("Day Monitor sends the weekly report", "Sunday"),
-    "WEEKLY_REPORT_TIME": ("Time (owner timezone) Monitor sends the weekly report", "20:00"),
+    "MONITOR_BOT": ("Name of your Monitor bot as shown in the sidebar (may be in your language)", "Monitor"),
+    "REMINDER_BOT": ("Name of your Reminder bot as shown in the sidebar (may be in your language)", "Reminder"),
+    "TRANSLATOR_BOT": ("Name of your Translator bot as shown in the sidebar (may be in your language)", "Translator"),
     "WORKSPACE_PATH": ("Root folder of the bot workspace", "/home/bot/grokbot"),
-    "X_USER_ID": ("Numeric ID of the X account Reader X reads", "0000000000"),
-    "X_USERNAME": ("X account Reader X reads", "@example_user"),
 }
 
 # Strict allowed placeholder keys (whitelist for all bots)
 ALLOWED_PLACEHOLDER_KEYS = frozenset(KEY_DOCS)
 
-# Bots the installer creates in this release (stage 1 of the roadmap), and the block it adds to
-# the user's own main bot. Keys used by these are the only ones asked at install; every other
-# key belongs to optional bots.
-STAGE1_BOTS = ("bot-maker", "mentor")
+# Bots the installer creates in this release, and the block it adds to the user's own main bot.
+# The release ships no other bots; the installer fills every key these texts use by itself.
+STAGE1_BOTS = ("bot-maker", "mentor", "reminder", "translator", "monitor")
 STAGE1_EXTENDED = ("main-grok",)
 
 # Keys that stage-1 bots read from config.json at run time instead of having them baked in at
@@ -696,13 +668,11 @@ def render_config_schema(usage: Dict[str, List[str]]) -> str:
         "`bots/*/block.md`, the shared blocks they include from `bots/_blocks/`, and the `name` in",
         "`bots/*/profile.json`).",
         "",
-        "\"Stage 1\": this release creates only " + ", ".join(STAGE1_BOTS) + " and adds "
+        "\"Stage 1\": this release creates " + ", ".join(STAGE1_BOTS) + " and adds "
         + ", ".join(f"`bots/{e}/block.md`" for e in STAGE1_EXTENDED) + " to the user's own",
-        "main bot. Keys marked **stage 1** are used by these texts and are the only ones the installer",
-        "writes to `config.json`. **stage 1 (runtime)**: the installer writes the key later (after it",
-        "creates the channel) and stage-1 bots read it from `config.json` when they need it; it is",
-        "never baked into their texts. All other keys are used by optional bots that this release",
-        "does not install; `config.example.json` keeps them so those bots still build.",
+        "main bot. Keys marked **stage 1** are used by these texts; the installer fills them in itself.",
+        "**stage 1 (runtime)**: the installer writes the key later (after it creates the channel) and",
+        "the bots read it from `config.json` when they need it; it is never baked into their texts.",
         "",
         "| Key | Meaning | Stage | Required? | Used by | Example (fictional) |",
         "|---|---|---|---|---|---|",
@@ -710,7 +680,7 @@ def render_config_schema(usage: Dict[str, List[str]]) -> str:
     for key in sorted(KEY_DOCS):
         meaning, example = KEY_DOCS[key]
         bots = usage.get(key, [])
-        required = "yes" if bots else "no (unused)"
+        required = "yes" if bots else ("no (read at run time)" if key in RUNTIME_KEYS else "no (unused)")
         used_by = ", ".join(bots) if bots else "-"
         if set(bots) & set(STAGE1_ALL):
             stage = "**stage 1**"

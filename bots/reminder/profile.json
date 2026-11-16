@@ -1,9 +1,4 @@
 {
-  "name": "Reminder",
-  "title": "",
-  "avatarShape": "",
-  "avatarColor": "",
-  "namedBy": "user",
-  "harness": "temporal",
-  "_comment": "Remove 'serverId' before creating bot. Persona lives only in prompt.md (do not add a description field here)."
+  "name": "{{REMINDER_BOT}}",
+  "_comment": "Name only, from config.json (Reminder, or the same word in the user's language). The bot's text lives in prompt.md."
 }

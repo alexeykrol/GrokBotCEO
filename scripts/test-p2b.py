@@ -1384,7 +1384,6 @@ def failing_git(*needles):
     return fake
 
 
-@needs_dev_history
 class TestR4HistoricalInputsFailClosed(unittest.TestCase):
     """B-095 (Codex 568ded6f): an access or read error on an existing historical input is not proof of absence."""
 
@@ -1431,6 +1430,10 @@ class TestR4HistoricalInputsFailClosed(unittest.TestCase):
         self.assertEqual(h.inputs(h.b)["rubrics"]["R-x"]["step"], "S1.L01.s01")
         with self.assertRaises(CM.BuildError):              # an unknown ref: the lesson listing itself fails
             h.inputs("0" * 40)
+
+    @r4
+    @needs_dev_history
+    def test_r405b_guard_real_010_history_is_proven_absent(self):
         # real history: 0.1.0 (ea17f9e) has no claims-map and no rubric table -> proven absent, built as before
         hist = CM.historical_inputs(CM.COURSE_DIR, "ea17f9e", scratch_dir(), CM.DEFAULT_CLAIMS, CM.DEFAULT_MAP,
                                     CM.DEFAULT_RUBRICS)
@@ -1442,6 +1445,7 @@ class TestR4HistoricalInputsFailClosed(unittest.TestCase):
         self.assertEqual(hashlib.sha256(json.dumps(hv, sort_keys=True).encode()).hexdigest()[:16], "0c5b60f47c435697")
 
     @r4
+    @needs_dev_history
     @unittest.skipUnless(HAVE_BUILD_INPUTS, "build inputs live only in the development repo")
     def test_r406_guard_020_historical_versions_unchanged(self):
         stored = json.loads(course_020().read_text(encoding="utf-8"))["course"]

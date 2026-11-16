@@ -18,6 +18,7 @@ import importlib.util
 import io
 import json
 import os
+import shlex
 import shutil
 import sys
 import tempfile
@@ -527,6 +528,74 @@ class TestRecord(Base):
         o = env.ok(self, "open", "S1.L01.s05")
         env.fails(self, "record", "--token", o["token"], "--artifact-ref",
                   json.dumps({"method": "user_confirm_form", "detail": "did it", "observed": "yes"}))
+
+    # --artifact-stdin: the same artifact as plain lines on stdin, no shell or JSON quoting (Codex 40d78214 P3:
+    # 22 of 28 refused records broke on inline '{...}' quoting, 6 on a double-escaped '). Same checks.
+    DETAIL_Q = "No tool call: the user's latest message in Mentor's chat; ends with (yes: \"…\") and 'Bot: Bot Maker'"
+
+    def stdin_env(self):
+        s1 = copy.deepcopy(BASE_STEPS)
+        s1[3] = exercise("S1.L01.s04", method="agent_tool", detail=self.DETAIL_Q)
+        env = self.fresh(base_course(s1=s1))
+        self.to_step(env, "S1.L01.s04")
+        return env, env.ok(self, "open", "S1.L01.s04")["token"]
+
+    def run_stdin(self, env, text, *args, ok=True, contains=None):
+        old = sys.stdin
+        sys.stdin = io.StringIO(text)
+        try:
+            return env.ok(self, *args) if ok else env.fails(self, *args, contains=contains)
+        finally:
+            sys.stdin = old
+
+    def test_artifact_stdin_apostrophes_and_quotes(self):
+        env, tok = self.stdin_env()
+        good = f"method: agent_tool\ndetail: {self.DETAIL_Q}\nobserved: latest user message: Привет, it's me\n"
+        rec = ("record", "--token", tok, "--artifact-stdin")
+        # a detail that differs (retyped, or the old ' escape written literally) is refused, nothing written
+        self.run_stdin(env, good.replace("user's", "users"), *rec, ok=False, contains="detail")
+        self.run_stdin(env, good.replace("user's", "user\\u0027s"), *rec, ok=False, contains="detail")
+        self.run_stdin(env, good.replace("agent_tool", "workspace_file"), *rec, ok=False, contains="method")
+        self.run_stdin(env, good.replace("observed: latest user message: Привет, it's me", "observed:  "), *rec,
+                       ok=False, contains="observed")
+        # malformed input: missing key, repeated key, foreign line, both flags at once
+        self.run_stdin(env, good.split("observed")[0], *rec, ok=False, contains="missing")
+        self.run_stdin(env, good + "detail: x\n", *rec, ok=False, contains="twice")
+        self.run_stdin(env, "note: hi\n" + good, *rec, ok=False, contains="each line")
+        self.run_stdin(env, '{"method": "agent_tool"}', *rec, ok=False, contains="each line")
+        self.run_stdin(env, good, *rec, "--artifact-ref", "{}", ok=False, contains="not both")
+        self.run_stdin(env, good, *rec, "--evidence", "own_answer", ok=False, contains="verified_artifact")
+        # the right lines (apostrophes, double quotes, Cyrillic as they are; indented or CRLF lines too)
+        r = self.run_stdin(env, "\n  " + good.replace("\n", "\r\n"), *rec)
+        self.assertEqual(r["status"], "confirmed")
+        h = env.state()["checks"]["S1.L01.s04"]["history"][-1]
+        self.assertEqual(h["artifact"], {"method": "agent_tool", "detail": self.DETAIL_Q,
+                                         "observed": "latest user message: Привет, it's me"})
+        self.assertEqual((h["rubric_verdict"], h["evidence"]), ("correct", "verified_artifact"))
+        # the token is consumed: the same lines again are refused like any repeated record
+        self.run_stdin(env, good, *rec, ok=False, contains="token")
+
+    def test_artifact_stdin_quiz_refused(self):
+        env = self.fresh()
+        self.to_step(env, "S1.L01.s02")
+        tok = env.ok(self, "open", "S1.L01.s02")["token"]
+        self.run_stdin(env, "method: a\ndetail: b\nobserved: c\n", "record", "--token", tok, "--attempt", 1,
+                       "--label", "a", "--option", "a", "--rubric", "incorrect", "--artifact-stdin",
+                       ok=False, contains="quiz")
+
+    def test_artifact_stdin_real_shell_heredoc(self):
+        """The exact form MENTOR-RUNTIME tells Mentor to write, through a real bash: a quoted heredoc keeps
+        every apostrophe and double quote of the detail as it is."""
+        import subprocess
+        env, tok = self.stdin_env()
+        script = (f"python3 -B {shlex.quote(str(RELEASE_DIR / "course" / "progress.py"))} --kb-home {shlex.quote(str(env.home))} "
+                  f"--course {shlex.quote(str(env.course_path))} record --token {tok} --artifact-stdin <<'REF'\n"
+                  f"method: agent_tool\ndetail: {self.DETAIL_Q}\nobserved: tool none; message «Привет» it's\nREF\n")
+        r = subprocess.run(["/bin/bash", "-c", script], capture_output=True, text=True,
+                           env={"PATH": "/usr/bin:/bin:/opt/homebrew/bin", "PYTHONDONTWRITEBYTECODE": "1"})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(r.stdout)["status"], "confirmed")
+        self.assertEqual(env.state()["checks"]["S1.L01.s04"]["history"][-1]["artifact"]["detail"], self.DETAIL_Q)
 
 
 class TestSummary(Base):

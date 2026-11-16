@@ -1,6 +1,6 @@
 # weekly-plan — Weekly Planning Session
 
-**Owner:** Weekplanner  
+**Owner:** a weekly-plan bot you make (this release does not install one)  
 **Trigger:** `CRON_TZ={{OWNER_TIMEZONE}} {{MINUTE}} {{HOUR}} * * 1` (Monday morning, disabled by default)  
 **Autonomy Level:** L1 (facilitates, owner decides)
 
@@ -23,4 +23,4 @@ Monday morning planning: review previous week, discuss priorities, record plan.
 - Plan recorded with clear goals and success criteria
 - Priorities aligned with owner's focus
 
-Related: Weekplanner bot, weekly-tracking process
+Related: weekly-tracking process

@@ -1,11 +1,13 @@
-- **reminders-tracking:** `CRON_TZ={{OWNER_TIMEZONE}} {{MINUTE}} {{HOUR}} * * *`, disabled by default. Daily morning healthcheck: tasks due today.
-- **cve-frog-nagging:** `CRON_TZ={{OWNER_TIMEZONE}} */{{INTERVAL_MINUTES}} {{HOUR_START}}-{{HOUR_END}} * * *`, disabled by default. CVE notification nagging.
+# Reminder routines
 
-**Setup:**
-1. Configure daily reminder time (morning healthcheck)
-2. Set CVE monitoring sources and {{CVE_PACKAGES}}
-3. Define {{CVE_NAG_INTERVAL}} (e.g., */30 8-23 for every 30 min, 8am-11pm)
-4. Create {{REMINDER_DATA_PATH}} directory
-5. Test manually before enabling
+Grok Bot keeps routines on its server, not in files. A bot creates its own routines when asked.
+None is created without the user's yes: the install plan asks once ("Yes, with routines"), or the
+user asks Reminder in its chat later.
 
-**Autonomy level:** L1 (reminds, never acts on tasks)
+- **morning reminders** — every day at 09:00 in the user's timezone (cron form:
+  `CRON_TZ=<the user's timezone> 0 9 * * *`). Reminder reads `data/reminder/tasks.jsonl` and sends
+  one short message with the open tasks due today and the overdue ones; nothing due, nothing sent.
+- **reminder: <text>** — one-time routines for a task with an exact time. The user's own request
+  ("remind me at 15:00") is the yes for that one routine.
+
+The user can change the time or stop a routine by telling Reminder in its chat.

@@ -17,6 +17,11 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent
 COMPILER_SCRIPT = SCRIPT_DIR / "bot-payload-compiler.py"
+# The installed set of release 0.2.0 (owner's decision 2026-11-16): the only bot folders shipped.
+INSTALLED_BOTS = ("bot-maker", "mentor", "reminder", "translator", "monitor")
+# Bots that are deliberately NOT shipped; none of them may come back into release/.
+REMOVED_BOTS = ("weekplanner", "reader-x", "reader-telegram", "implementer", "task-manager",
+                "projects-manager", "repository-analyst", "director")
 
 class TestPayloadCreate(unittest.TestCase):
     def setUp(self):
@@ -100,12 +105,12 @@ class TestPayloadCreate(unittest.TestCase):
         self.profile_path.write_text(json.dumps(profile))
         
         # Canonical prompt with allowed placeholders
-        self.prompt_path.write_text("Bot for {{WORKSPACE_PATH}} in {{OWNER_TIMEZONE}}")
+        self.prompt_path.write_text("Bot for {{WORKSPACE_PATH}} in {{MENTOR_BOT}}")
         
         result = subprocess.run(
             [sys.executable, str(COMPILER_SCRIPT), "create", str(self.profile_path),
              "--param", "WORKSPACE_PATH=/home/bot/grokbot",
-             "--param", "OWNER_TIMEZONE=America/Los_Angeles"],
+             "--param", "MENTOR_BOT=America/Los_Angeles"],
             capture_output=True,
             text=True
         )
@@ -298,7 +303,7 @@ class TestActualBotTemplates(unittest.TestCase):
     """Test real bot templates from repository"""
     
     def test_all_bots_compile(self):
-        """All 13+ bot templates must compile successfully (with dummy params for placeholders)"""
+        """Every shipped bot compiles (with dummy params for placeholders)"""
         bots_dir = SCRIPT_DIR.parent / "bots"
         
         if not bots_dir.exists():
@@ -310,40 +315,13 @@ class TestActualBotTemplates(unittest.TestCase):
         
         # Dummy params for placeholder resolution (all possible placeholders)
         dummy_params = [
-            "--param", "IMPLEMENTER_BOT=@implementer",
-            "--param", "READER_X_BOT=@reader-x",
-            "--param", "REMINDER_BOT=@reminder",
             "--param", "BOT_MAKER_BOT=@bot-maker",
             "--param", "MENTOR_BOT=Mentor",
-            "--param", "TASK_MANAGER_BOT=@task-manager",
-            "--param", "REPOSITORY_ANALYST_BOT=@repository-analyst",
-            "--param", "TRANSLATOR_BOT=@translator",
-            "--param", "IMPROVEMENTS_CHANNEL=#improvements",
+            "--param", "REMINDER_BOT=Reminder",
+            "--param", "TRANSLATOR_BOT=Translator",
+            "--param", "MONITOR_BOT=Monitor",
             "--param", "IMPROVEMENTS_CHANNEL_ID=C12345",
-            "--param", "PUBLISHING_CHANNEL=#publishing",
-            "--param", "OWNER_TIMEZONE=America/Los_Angeles",
-            "--param", "WORKSPACE_PATH=/home/bot/grokbot",
-            "--param", "MONITOR_DATA_PATH=/home/bot/grokbot/data/monitor",
-            "--param", "READING_DATA_PATH=/home/bot/grokbot/data/reading",
-            "--param", "READING_FILTER_PATH=/home/bot/grokbot/data/reading/filter.json",
-            "--param", "REMINDER_DATA_PATH=/home/bot/grokbot/data/reminders",
-            "--param", "ANALYSIS_DATA_PATH=/home/bot/grokbot/data/analysis",
-            "--param", "PLANNING_DATA_PATH=/home/bot/grokbot/data/planning",
-            "--param", "PROJECT_TRACKING_PATH=/home/bot/grokbot/data/projects",
-            "--param", "VIDEO_PROJECT_PATH=/home/bot/grokbot/videos",
-            "--param", "REPORT_LANGUAGE=Russian",
-            "--param", "OUTPUT_LANGUAGE=English",
-            "--param", "WEEKLY_REPORT_DAY=Sunday",
-            "--param", "WEEKLY_REPORT_TIME=20:00",
-            "--param", "HOUR=09",
-            "--param", "MINUTE=00",
-            "--param", "DAY_OF_WEEK=Monday",
-            "--param", "READING_ROUTINE_NAME=daily-reading",
-            "--param", "NOTION_PROJECT_DATABASE=https://notion.so/db123",
-            "--param", "CVE_NAG_INTERVAL=7d",
-            "--param", "CVE_PACKAGES=package1,package2",
-            "--param", "X_USER_ID=123456789",
-            "--param", "X_USERNAME=@testuser"
+            "--param", "WORKSPACE_PATH=/home/bot/grokbot"
         ]
         
         for bot_dir in bot_dirs:
@@ -375,7 +353,7 @@ class TestActualBotTemplates(unittest.TestCase):
                         f"Bot {bot_dir.name} leaked metadata: {metadata_key}")
 
 class TestCanonicalPersonaIdentities(unittest.TestCase):
-    """Negative contract test 1: Verify all 13+ bot identities use FULL canonical prompt.md with anti-jobs"""
+    """Negative contract test 1: every shipped bot uses the FULL canonical prompt.md with anti-jobs"""
     
     def test_all_bots_have_full_canonical_persona(self):
         """All bot payloads must contain full prompt.md content including anti-jobs, not summaries"""
@@ -386,45 +364,18 @@ class TestCanonicalPersonaIdentities(unittest.TestCase):
         
         bot_dirs = [d for d in bots_dir.iterdir() if d.is_dir() and (d / "profile.json").exists()]
         
-        # Require at least 13 bots (as stated in review)
-        self.assertGreaterEqual(len(bot_dirs), 13, "Expected at least 13 bot templates")
+        # Exactly the bots this release installs (0.2.0); nothing else is shipped
+        self.assertEqual(sorted(d.name for d in bot_dirs), sorted(INSTALLED_BOTS))
         
         # Complete dummy params matching all possible placeholders
         dummy_params = [
-            "--param", "IMPLEMENTER_BOT=@implementer",
-            "--param", "READER_X_BOT=@reader-x",
-            "--param", "REMINDER_BOT=@reminder",
             "--param", "BOT_MAKER_BOT=@bot-maker",
             "--param", "MENTOR_BOT=Mentor",
-            "--param", "TASK_MANAGER_BOT=@task-manager",
-            "--param", "REPOSITORY_ANALYST_BOT=@repository-analyst",
-            "--param", "TRANSLATOR_BOT=@translator",
-            "--param", "IMPROVEMENTS_CHANNEL=#improvements",
+            "--param", "REMINDER_BOT=Reminder",
+            "--param", "TRANSLATOR_BOT=Translator",
+            "--param", "MONITOR_BOT=Monitor",
             "--param", "IMPROVEMENTS_CHANNEL_ID=C12345",
-            "--param", "PUBLISHING_CHANNEL=#publishing",
-            "--param", "OWNER_TIMEZONE=America/Los_Angeles",
-            "--param", "WORKSPACE_PATH=/home/bot/grokbot",
-            "--param", "MONITOR_DATA_PATH=/home/bot/grokbot/data/monitor",
-            "--param", "READING_DATA_PATH=/home/bot/grokbot/data/reading",
-            "--param", "READING_FILTER_PATH=/home/bot/grokbot/data/reading/filter.json",
-            "--param", "REMINDER_DATA_PATH=/home/bot/grokbot/data/reminders",
-            "--param", "ANALYSIS_DATA_PATH=/home/bot/grokbot/data/analysis",
-            "--param", "PLANNING_DATA_PATH=/home/bot/grokbot/data/planning",
-            "--param", "PROJECT_TRACKING_PATH=/home/bot/grokbot/data/projects",
-            "--param", "VIDEO_PROJECT_PATH=/home/bot/grokbot/videos",
-            "--param", "REPORT_LANGUAGE=Russian",
-            "--param", "OUTPUT_LANGUAGE=English",
-            "--param", "WEEKLY_REPORT_DAY=Sunday",
-            "--param", "WEEKLY_REPORT_TIME=20:00",
-            "--param", "HOUR=09",
-            "--param", "MINUTE=00",
-            "--param", "DAY_OF_WEEK=Monday",
-            "--param", "READING_ROUTINE_NAME=daily-reading",
-            "--param", "NOTION_PROJECT_DATABASE=https://notion.so/db123",
-            "--param", "CVE_NAG_INTERVAL=7d",
-            "--param", "CVE_PACKAGES=package1,package2",
-            "--param", "X_USER_ID=123456789",
-            "--param", "X_USERNAME=@testuser"
+            "--param", "WORKSPACE_PATH=/home/bot/grokbot"
         ]
         
         for bot_dir in bot_dirs:
@@ -620,7 +571,7 @@ class TestParameterOrderIndependence(unittest.TestCase):
         
         # Prompt with multiple placeholders
         with open(self.prompt_path, 'w') as f:
-            f.write("Bot uses {{WORKSPACE_PATH}} and {{OWNER_TIMEZONE}} and {{REPORT_LANGUAGE}}")
+            f.write("Bot uses {{WORKSPACE_PATH}} and {{MENTOR_BOT}} and {{REMINDER_BOT}}")
     
     def tearDown(self):
         shutil.rmtree(self.temp_dir)
@@ -629,14 +580,14 @@ class TestParameterOrderIndependence(unittest.TestCase):
         """Result must be identical regardless of --param order"""
         params1 = [
             "--param", "WORKSPACE_PATH=/home/bot/grokbot",
-            "--param", "OWNER_TIMEZONE=America/Los_Angeles",
-            "--param", "REPORT_LANGUAGE=English"
+            "--param", "MENTOR_BOT=America/Los_Angeles",
+            "--param", "REMINDER_BOT=English"
         ]
         
         params2 = [
-            "--param", "REPORT_LANGUAGE=English",
+            "--param", "REMINDER_BOT=English",
             "--param", "WORKSPACE_PATH=/home/bot/grokbot",
-            "--param", "OWNER_TIMEZONE=America/Los_Angeles"
+            "--param", "MENTOR_BOT=America/Los_Angeles"
         ]
         
         result1 = subprocess.run(
@@ -934,7 +885,7 @@ class TestPersonaSource(unittest.TestCase):
         """Every bots/*/profile.json holds only name + non-persona metadata"""
         compiler = _load_compiler_module()
         profiles = sorted(REAL_BOTS_DIR.glob("*/profile.json"))
-        self.assertGreaterEqual(len(profiles), 13)
+        self.assertEqual(sorted(p.parent.name for p in profiles), sorted(INSTALLED_BOTS))
         for path in profiles:
             with self.subTest(bot=path.parent.name):
                 profile = json.loads(path.read_text(encoding="utf-8"))
@@ -967,7 +918,7 @@ class TestConfigFile(unittest.TestCase):
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
-        self.bot = _make_bot(self.tmp / "bots", "alpha", "Bot in {{WORKSPACE_PATH}} at {{OWNER_TIMEZONE}}")
+        self.bot = _make_bot(self.tmp / "bots", "alpha", "Bot in {{WORKSPACE_PATH}} at {{MENTOR_BOT}}")
         self.config = self.tmp / "config.json"
 
     def tearDown(self):
@@ -977,33 +928,33 @@ class TestConfigFile(unittest.TestCase):
         self.config.write_text(json.dumps(data) if not isinstance(data, str) else data)
 
     def test_config_resolves_placeholders(self):
-        self._write_config({"WORKSPACE_PATH": "/srv/test", "OWNER_TIMEZONE": "UTC"})
+        self._write_config({"WORKSPACE_PATH": "/srv/test", "MENTOR_BOT": "UTC"})
         r = _run("create", self.bot / "profile.json", "--config", self.config)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(json.loads(r.stdout)["description"], "Bot in /srv/test at UTC")
 
     def test_param_overrides_config(self):
-        self._write_config({"WORKSPACE_PATH": "/srv/test", "OWNER_TIMEZONE": "UTC"})
+        self._write_config({"WORKSPACE_PATH": "/srv/test", "MENTOR_BOT": "UTC"})
         r = _run("create", self.bot / "profile.json", "--config", self.config,
-                 "--param", "OWNER_TIMEZONE=Asia/Tokyo")
+                 "--param", "MENTOR_BOT=Asia/Tokyo")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(json.loads(r.stdout)["description"], "Bot in /srv/test at Asia/Tokyo")
 
     def test_config_and_param_combined(self):
         self._write_config({"WORKSPACE_PATH": "/srv/test"})
-        r = _run("create", self.bot / "profile.json", "--config", self.config, "--param", "OWNER_TIMEZONE=UTC")
+        r = _run("create", self.bot / "profile.json", "--config", self.config, "--param", "MENTOR_BOT=UTC")
         self.assertEqual(r.returncode, 0, r.stderr)
 
     def test_unknown_config_key_rejected(self):
-        self._write_config({"WORKSPACE_PATH": "/srv/test", "OWNER_TIMEZONE": "UTC", "YOUR_TIMEZONE": "UTC"})
+        self._write_config({"WORKSPACE_PATH": "/srv/test", "MENTOR_BOT": "UTC", "YOUR_TIMEZONE": "UTC"})
         r = _run("create", self.bot / "profile.json", "--config", self.config)
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("YOUR_TIMEZONE", r.stderr)
 
     def test_placeholder_in_config_value_rejected(self):
-        for bad in ["/srv/{{OWNER_TIMEZONE}}", "/srv/{{", "/srv/}}"]:
+        for bad in ["/srv/{{MENTOR_BOT}}", "/srv/{{", "/srv/}}"]:
             with self.subTest(value=bad):
-                self._write_config({"WORKSPACE_PATH": bad, "OWNER_TIMEZONE": "UTC"})
+                self._write_config({"WORKSPACE_PATH": bad, "MENTOR_BOT": "UTC"})
                 r = _run("create", self.bot / "profile.json", "--config", self.config)
                 self.assertNotEqual(r.returncode, 0)
                 self.assertIn("WORKSPACE_PATH", r.stderr)
@@ -1012,12 +963,12 @@ class TestConfigFile(unittest.TestCase):
         self._write_config({"WORKSPACE_PATH": "/srv/test"})
         r = _run("create", self.bot / "profile.json", "--config", self.config)
         self.assertNotEqual(r.returncode, 0)
-        self.assertIn("OWNER_TIMEZONE", r.stderr)
+        self.assertIn("MENTOR_BOT", r.stderr)
 
     def test_malformed_config_rejected(self):
-        for bad in ['["WORKSPACE_PATH"]', '{"WORKSPACE_PATH": 5, "OWNER_TIMEZONE": "UTC"}',
-                    '{"WORKSPACE_PATH": "", "OWNER_TIMEZONE": "UTC"}', '{not json',
-                    '{"workspace_path": "/srv", "OWNER_TIMEZONE": "UTC"}']:
+        for bad in ['["WORKSPACE_PATH"]', '{"WORKSPACE_PATH": 5, "MENTOR_BOT": "UTC"}',
+                    '{"WORKSPACE_PATH": "", "MENTOR_BOT": "UTC"}', '{not json',
+                    '{"workspace_path": "/srv", "MENTOR_BOT": "UTC"}']:
             with self.subTest(config=bad):
                 self._write_config(bad)
                 r = _run("create", self.bot / "profile.json", "--config", self.config)
@@ -1042,9 +993,9 @@ class TestBuild(unittest.TestCase):
         self.bots = self.tmp / "bots"
         _make_bot(self.bots, "alpha", "Alpha persona in {{WORKSPACE_PATH}}",
                   {"name": "Test Bot Alpha", "title": "x", "avatarShape": "blob", "_comment": "meta"})
-        _make_bot(self.bots, "beta", "Beta persona, timezone {{OWNER_TIMEZONE}}\n", {"name": "Test Bot Beta"})
+        _make_bot(self.bots, "beta", "Beta persona, timezone {{MENTOR_BOT}}\n", {"name": "Test Bot Beta"})
         self.config = self.tmp / "config.json"
-        self.config.write_text(json.dumps({"WORKSPACE_PATH": "/srv/test", "OWNER_TIMEZONE": "UTC"}))
+        self.config.write_text(json.dumps({"WORKSPACE_PATH": "/srv/test", "MENTOR_BOT": "UTC"}))
 
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
@@ -1087,7 +1038,7 @@ class TestBuild(unittest.TestCase):
         self.assertEqual(len(list(out.glob("*.payload.json"))), 2)
 
     def test_one_bad_bot_fails_whole_build_nothing_written(self):
-        _make_bot(self.bots, "gamma", "Gamma uses {{REPORT_LANGUAGE}}")  # key missing from config
+        _make_bot(self.bots, "gamma", "Gamma uses {{REMINDER_BOT}}")  # key missing from config
         for out_name, pre_create in [("out-new", False), ("out-existing", True)]:
             with self.subTest(out=out_name):
                 out = self.tmp / out_name
@@ -1096,14 +1047,14 @@ class TestBuild(unittest.TestCase):
                 r = self._build(out, "alpha,gamma,beta")
                 self.assertNotEqual(r.returncode, 0)
                 self.assertIn("gamma", r.stderr)
-                self.assertIn("REPORT_LANGUAGE", r.stderr)
+                self.assertIn("REMINDER_BOT", r.stderr)
                 if pre_create:
                     self.assertEqual(list(out.iterdir()), [], "partial output written")
                 else:
                     self.assertFalse(out.exists(), "output folder created on failed build")
 
     def test_all_errors_reported(self):
-        _make_bot(self.bots, "gamma", "Gamma uses {{REPORT_LANGUAGE}}")
+        _make_bot(self.bots, "gamma", "Gamma uses {{REMINDER_BOT}}")
         r = self._build(self.tmp / "out", "gamma,missing-bot")
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("gamma", r.stderr)
@@ -1199,7 +1150,8 @@ class TestStage1(unittest.TestCase):
         return config
 
     def test_stage1_bots(self):
-        self.assertEqual(tuple(self.compiler.STAGE1_BOTS), ("bot-maker", "mentor"))
+        self.assertEqual(tuple(self.compiler.STAGE1_BOTS), INSTALLED_BOTS)
+        self.assertEqual(self.compiler.list_bot_ids(REAL_BOTS_DIR), sorted(INSTALLED_BOTS))
         self.assertEqual(tuple(self.compiler.STAGE1_EXTENDED), ("main-grok",))
         self.assertEqual(self.compiler.list_extension_ids(REAL_BOTS_DIR), ["main-grok"])
         self.assertNotIn("main-grok", self.compiler.list_bot_ids(REAL_BOTS_DIR),
@@ -1210,20 +1162,23 @@ class TestStage1(unittest.TestCase):
     def test_stage1_keys(self):
         """The installer fills exactly these keys itself (LOADING-INSTRUCTIONS step 5)"""
         keys = self.compiler.stage1_keys(REAL_BOTS_DIR)
-        self.assertEqual(keys, ["BOT_MAKER_BOT", "MENTOR_BOT", "WORKSPACE_PATH"])
+        self.assertEqual(keys, ["BOT_MAKER_BOT", "MENTOR_BOT", "MONITOR_BOT", "REMINDER_BOT",
+                                "TRANSLATOR_BOT", "WORKSPACE_PATH"])
+        self.assertEqual(sorted(self.compiler.KEY_DOCS), sorted(keys + sorted(self.compiler.RUNTIME_KEYS)),
+                         "no key of a bot that is not shipped")
         loading = (ROOT_DIR / "LOADING-INSTRUCTIONS.md").read_text(encoding="utf-8")
         for key in keys + sorted(self.compiler.RUNTIME_KEYS):
             self.assertIn(f"`{key}`", loading)
 
     def test_build_with_only_stage1_keys(self):
         out = self.tmp / "build"
-        r = _run("build", "--config", self._stage1_config(), "--bots", "bot-maker,mentor", "--out", out)
+        r = _run("build", "--config", self._stage1_config(), "--bots", ",".join(INSTALLED_BOTS), "--out", out)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(sorted(p.name for p in out.iterdir()),
-                         ["bot-maker.md", "bot-maker.payload.json", "mentor.md", "mentor.payload.json"])
+                         sorted(f"{b}{ext}" for b in INSTALLED_BOTS for ext in (".md", ".payload.json")))
         names = {json.loads((out / f"{b}.payload.json").read_text(encoding="utf-8"))["name"]
-                 for b in ("bot-maker", "mentor")}
-        self.assertEqual(names, {"Mentor", "Bot Maker"})
+                 for b in INSTALLED_BOTS}
+        self.assertEqual(names, {"Mentor", "Bot Maker", "Reminder", "Translator", "Monitor"})
         for md in out.glob("*.md"):
             text = md.read_text(encoding="utf-8")
             self.assertNotIn("{{", text, md.name)
@@ -1260,7 +1215,7 @@ class TestStage1(unittest.TestCase):
             with self.subTest(missing=missing):
                 out = self.tmp / f"out-{missing}"
                 r = _run("build", "--config", self._stage1_config(skip=missing),
-                         "--bots", "bot-maker,mentor", "--out", out)
+                         "--bots", ",".join(INSTALLED_BOTS), "--out", out)
                 self.assertNotEqual(r.returncode, 0)
                 self.assertIn(missing, r.stderr)
                 ext = _run("extend", "--bot", "main-grok", "--agent-id", "main-0001", "--agents-dir", agents,
@@ -1279,7 +1234,8 @@ class TestStage1(unittest.TestCase):
             with self.subTest(file=str(path.relative_to(REAL_BOTS_DIR))):
                 text = path.read_text(encoding="utf-8")
                 bot_keys = set(re.findall(r"\{\{([A-Z_]+_BOT)\}\}", text))
-                self.assertLessEqual(bot_keys, {"BOT_MAKER_BOT", "MENTOR_BOT"})
+                self.assertLessEqual(bot_keys, {"BOT_MAKER_BOT", "MENTOR_BOT", "REMINDER_BOT",
+                                                "TRANSLATOR_BOT", "MONITOR_BOT"})
 
     def test_schema_marks_stage1_keys(self):
         keys = set(self.compiler.stage1_keys(REAL_BOTS_DIR))
@@ -1295,13 +1251,118 @@ class TestStage1(unittest.TestCase):
 
     def test_loading_instructions_use_repo_mirror(self):
         loading = (ROOT_DIR / "LOADING-INSTRUCTIONS.md").read_text(encoding="utf-8")
-        for needle in ["--bots bot-maker,mentor", "extend", "--bot main-grok",
+        for needle in ["--bots bot-maker,mentor,reminder,translator,monitor", "extend", "--bot main-grok",
                        "~/agent-data/agents/<agent_id>/profile.json", "bot-mirror.py list",
                        "bots/core/", "bots/my/", "bots/marketplace/", "channels/improvements.md",
                        "previous.md", "NOT APPLIED", "CreateChannel", "git init", "Bot: ", '(yes: \\"']:
             self.assertIn(needle, loading)
         for gone in ["skills/mentor", "Main Grok", "mentor tour", "mentor skill"]:
             self.assertNotIn(gone, loading)
+
+
+class TestInstalledSet(unittest.TestCase):
+    """0.2.0: the release ships exactly the bots it installs; a removed bot must not come back"""
+
+    TEXT_SUFFIXES = {".md", ".json", ".py", ".sh", ".tsv", ".txt", ".sql"}
+    REMOVED_NAMES = ["Weekplanner", "Reader X", "Reader Telegram", "Implementer", "Task Manager",
+                     "Projects Manager", "Repository Analyst", "Недельник", "Внедритель"]
+
+    def _release_texts(self):
+        for path in sorted(ROOT_DIR.rglob("*")):
+            if (path.is_file() and path.suffix in self.TEXT_SUFFIXES and "__pycache__" not in path.parts
+                    and path.name != "MANIFEST.sha256" and path != Path(__file__).resolve()):
+                yield path, path.read_text(encoding="utf-8", errors="replace")
+
+    def test_bot_folders_are_the_installed_set(self):
+        folders = sorted(d.name for d in REAL_BOTS_DIR.iterdir() if d.is_dir() and not d.name.startswith("_"))
+        self.assertEqual(folders, sorted(INSTALLED_BOTS + ("main-grok",)))
+        for bot in REMOVED_BOTS:
+            self.assertFalse((REAL_BOTS_DIR / bot).exists(), f"{bot} is not shipped in this release")
+
+    def test_no_reference_to_a_removed_bot(self):
+        import re
+        ids = re.compile(r"(?<![\w-])(" + "|".join(map(re.escape, REMOVED_BOTS)) + r")(?![\w-])")
+        hits = []
+        for path, text in self._release_texts():
+            for no, line in enumerate(text.splitlines(), 1):
+                if ids.search(line) or any(n in line for n in self.REMOVED_NAMES):
+                    hits.append(f"{path.relative_to(ROOT_DIR)}:{no}")
+        self.assertEqual(hits, [])
+
+    def test_no_reader_tooling_or_settings(self):
+        for rel in ["scripts/reading-dedup-sort.py", "scripts/test-reader.py", "data-schemas",
+                    "skills/post"]:
+            self.assertFalse((ROOT_DIR / rel).exists(), rel)
+        self.assertEqual(sorted(REAL_BOTS_DIR.glob("*/settings.json")), [],
+                         "settings are not sent by CreateAgent; no bot ships settings.json")
+
+    def test_installer_builds_and_creates_the_installed_set(self):
+        loading = (ROOT_DIR / "LOADING-INSTRUCTIONS.md").read_text(encoding="utf-8")
+        self.assertIn("--bots " + ",".join(INSTALLED_BOTS), loading)
+        self.assertIn("in this order: " + ", ".join(f"`{b}`" for b in INSTALLED_BOTS), loading)
+        for word in ["Reminder", "Translator", "Monitor", "REMINDER_BOT", "TRANSLATOR_BOT", "MONITOR_BOT"]:
+            self.assertIn(word, loading)
+
+    def test_routines_only_after_the_users_yes(self):
+        loading = (ROOT_DIR / "LOADING-INSTRUCTIONS.md").read_text(encoding="utf-8")
+        for needle in ["## 8a. Routines (only after \"Yes, with routines\")", "`Да, с рутинами`",
+                       "`Да, без рутин`", "you never create one", '"routine": "not chosen"',
+                       "not verified", "morning reminders", "weekly report"]:
+            self.assertIn(needle, loading)
+        for bot, routine in [("reminder", "morning reminders"), ("monitor", "weekly report")]:
+            with self.subTest(bot=bot):
+                text = (REAL_BOTS_DIR / bot / "prompt.md").read_text(encoding="utf-8")
+                self.assertIn("create a routine only" if bot == "reminder" else "only (a) when the user asks", text)
+                self.assertIn("quotes their exact words", text)
+                self.assertIn(f"grokbotceo/bots/{bot}/routines.md", text)
+                self.assertIn(routine, (REAL_BOTS_DIR / bot / "routines.md").read_text(encoding="utf-8"))
+        self.assertFalse((REAL_BOTS_DIR / "translator" / "routines.md").exists())
+        self.assertIn("You have no routines", (REAL_BOTS_DIR / "translator" / "prompt.md").read_text(encoding="utf-8"))
+
+    def test_new_bots_carry_routing_and_stay_out_of_the_channel(self):
+        for bot in ("reminder", "translator", "monitor"):
+            with self.subTest(bot=bot):
+                text = (REAL_BOTS_DIR / bot / "prompt.md").read_text(encoding="utf-8")
+                self.assertIn("[[block:routing]]", text)
+                self.assertNotIn("{{IMPROVEMENTS_CHANNEL", text)
+                self.assertIn("Never:", text)
+                self.assertIn("one ready example", text)
+                profile = json.loads((REAL_BOTS_DIR / bot / "profile.json").read_text(encoding="utf-8"))
+                self.assertEqual(profile["name"], "{{" + bot.upper() + "_BOT}}")
+        monitor = (REAL_BOTS_DIR / "monitor" / "prompt.md").read_text(encoding="utf-8")
+        self.assertIn("never post there", monitor)
+        self.assertIn("never publish", (REAL_BOTS_DIR / "translator" / "prompt.md").read_text(encoding="utf-8"))
+
+    def test_nothing_personal_in_bot_texts(self):
+        import re
+        # Personal names and handles are checked by the leak gate (private stoplist); here only the
+        # generic markers of a real install: a fixed timezone, a Notion or Telegram link, a home path,
+        # a machine id, a UUID.
+        bad = re.compile(r"America/|Europe/|notion\.so|t\.me/|/Users/|/home/[a-z]|machineId|"
+                         r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}")
+        for path in sorted(REAL_BOTS_DIR.rglob("*")):
+            if path.is_file():
+                with self.subTest(file=str(path.relative_to(REAL_BOTS_DIR))):
+                    self.assertIsNone(bad.search(path.read_text(encoding="utf-8")))
+
+    def test_readmes_list_the_installed_set_in_both_languages(self):
+        en = (ROOT_DIR / "README.md").read_text(encoding="utf-8")
+        ru = (ROOT_DIR / "README.ru.md").read_text(encoding="utf-8")
+        self.assertIn("[Русский](README.ru.md)", en)
+        self.assertIn("[English](README.md)", ru)
+        for word in ["Bot Maker", "Mentor", "Reminder", "Translator", "Monitor", "#Improvements"]:
+            self.assertIn(word, en)
+        for word in ["Bot Maker", "Ментор", "Напоминальник", "Переводчик", "Монитор", "#Улучшения"]:
+            self.assertIn(word, ru)
+        for text in (en, ru):
+            self.assertIn("Lauren Tan", text)
+            self.assertIn("TODO(owner)", text)
+        for name in ("ONBOARDING.md", "ONBOARDING.ru.md"):
+            text = (ROOT_DIR / name).read_text(encoding="utf-8")
+            self.assertNotIn("покажи, что здесь есть", text)
+            self.assertNotIn("show me around", text)
+        self.assertIn("Let's start the course", (ROOT_DIR / "ONBOARDING.md").read_text(encoding="utf-8"))
+        self.assertIn("Начнём курс", (ROOT_DIR / "ONBOARDING.ru.md").read_text(encoding="utf-8"))
 
 
 class TestBlocks(unittest.TestCase):
@@ -1542,7 +1603,7 @@ class TestRc3Mechanics(unittest.TestCase):
     def test_main_block(self):
         text = (REAL_BOTS_DIR / "main-grok" / "block.md").read_text(encoding="utf-8")
         body = text.replace("[[block:routing]]", "")
-        self.assertLessEqual(len(body), 1700, "the main-bot block stays short (~1.5k)")
+        self.assertLessEqual(len(body), 1900, "the main-bot block stays short (~1.9k)")
         for needle in ["never own a routine", "what the job is", "which bot should own it",
                        "what starts it", "{{MENTOR_BOT}}", "Refresh my copy"]:
             self.assertIn(needle, text)
@@ -1568,7 +1629,7 @@ class TestRc3Mechanics(unittest.TestCase):
         self.assertEqual(hits, [])
 
     def test_version(self):
-        self.assertEqual((ROOT_DIR / "VERSION").read_text(encoding="utf-8").strip(), "0.1.0-rc7")
+        self.assertEqual((ROOT_DIR / "VERSION").read_text(encoding="utf-8").strip(), "0.2.0")
 
 
 class TestPublicTreeHygiene(unittest.TestCase):
@@ -1576,6 +1637,8 @@ class TestPublicTreeHygiene(unittest.TestCase):
 
     # Assembled from parts so this file does not contain the words itself
     FORBIDDEN = ["pote" + "to", "mad" + "-scientist", "mad" + " scientist", "ps" + "tack"]
+    CREDIT = "lauren tan (pote" + "to)"
+    CREDIT_RU = "lauren tan, pote" + "to)"
 
     def test_no_third_party_template_words(self):
         hits = []
@@ -1583,6 +1646,8 @@ class TestPublicTreeHygiene(unittest.TestCase):
             if not path.is_file() or "__pycache__" in path.parts or ".git" in path.parts:
                 continue
             text = path.read_bytes().decode("utf-8", errors="ignore").lower()
+            # the one allowed mention: the owner's credit line (decision 2026-11-16)
+            text = text.replace(self.CREDIT, "").replace(self.CREDIT_RU, "")
             rel = str(path.relative_to(ROOT_DIR)).lower()
             for word in self.FORBIDDEN:
                 if word in text or word in rel:
@@ -2173,7 +2238,8 @@ class TestMentorRunsTheCourse(unittest.TestCase):
         for needle in ["mentor/progress.json", "course/course.json", "course/MENTOR-RUNTIME.md",
                        "Never improvise steps", "search.py ask", "--kb-home {{WORKSPACE_PATH}}/mentor",
                        "record a miss", "search.py miss", "Restate in one line", "Answer only from the units",
-                       "[Start the course] [Not now]", "one ready example"]:
+                       "[Start the course] [Not now]", "one ready example",
+                       "Asks to start, resume or where they are: The course."]:
             self.assertIn(needle, self.mentor)
 
     def test_runtime_covers_every_step_type_and_rule(self):
@@ -2181,7 +2247,7 @@ class TestMentorRunsTheCourse(unittest.TestCase):
                        "workspace_file", "list_sections", "config_key", "agent_tool", "user_confirm_form",
                        "unverified: true", "skip_reasons", "`needs`", "feature coming", "course_version",
                        "P migrate --json", "grokbotceo/course/progress.py", "never write `mentor/progress.json` yourself",
-                       "P open", "--said-done", "--artifact-ref", "scoring: false", "never delete the lock",
+                       "P open", "--said-done", "--artifact-stdin", "scoring: false", "never delete the lock",
                        "Never invent", "Bot: <your name>", "mentor/progress.json",
                        "search.py ask", "search.py miss", "--kb-home mentor", "`lessons`", "Restate in one line",
                        "answer only from the returned units"]:

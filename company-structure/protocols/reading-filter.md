@@ -1,6 +1,6 @@
 # reading-filter — Post Relevance Criteria
 
-Criteria for selecting posts from X and Telegram feeds. Used by Reader bots to score posts (★1-5) and select valuable content (★3+).
+Criteria for selecting posts from X and Telegram feeds. Used by reader bots you make to score posts (★1-5) and select valuable content (★3+).
 
 ## Scoring Framework
 
@@ -61,7 +61,7 @@ Criteria for selecting posts from X and Telegram feeds. Used by Reader bots to s
 
 ## Routing Rules
 
-**★3+ agent/tool/workflow posts → Implementer** for analysis (with post_id, cycle_no, article_path)
+**★3+ agent/tool/workflow posts → an analyst bot**, if you have one, for analysis (with the link and the article)
 
 **All selected posts (★3+) → Owner digest** grouped by rubrics:
 - Agents & Tools
@@ -82,5 +82,5 @@ Adapt criteria to your interests:
 ---
 
 **Location:** Store as {{READING_FILTER_PATH}}/reading-filter.md  
-**Used by:** Reader X, Reader Telegram (re-read every run for changes)  
-**Related:** morning-reading process, Reader bot prompts
+**Used by:** reader bots you make (re-read every run for changes)  
+**Related:** morning-reading process

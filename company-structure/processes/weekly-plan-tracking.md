@@ -1,6 +1,6 @@
 # weekly-plan-tracking — Weekly Progress Tracking
 
-**Owner:** Weekplanner  
+**Owner:** the weekly-plan bot you make (this release does not install one)  
 **Trigger:** `CRON_TZ={{OWNER_TIMEZONE}} {{MINUTE}} {{HOUR}} * * 0` (Sunday evening, disabled by default) + Events (owner progress reports)  
 **Autonomy Level:** L1 (tracks, owner acts)
 
@@ -25,4 +25,4 @@ Track week progress: Sunday review of outcomes, event-driven updates when owner 
 - Blockers identified
 - Progress visible for planning
 
-Related: Weekplanner bot, weekly-plan process
+Related: weekly-plan process

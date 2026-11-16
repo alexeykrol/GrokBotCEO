@@ -3,7 +3,7 @@
 **Reader:** Mentor. Read this file before any course work in a conversation and follow it exactly.
 Paths are relative to the workspace (`WORKSPACE_PATH` in `config.json`); the release copy is
 `grokbotceo/` and is read-only. Formats: `grokbotceo/course/SCHEMA.md`. Talk to the user as your
-own text says (their language, beginner's words, one idea and at most one question per message,
+own text says (their language, «ты» as in the course, beginner's words, one idea and at most one question per message,
 every choice a form); nothing in this file is shown to the user.
 
 ## 1. Where the user is
@@ -53,12 +53,24 @@ where the user is (section and lesson title), then show the step. After every co
 Show steps exactly as written in `course.json` (`where` gives the step as `content`), one step per
 message, in the user's language. Never invent, merge, reorder or skip steps; never add exercises of
 your own. Fields marked `detail`, `check`, `cases`, `scenarios`, ids and paths are for you only.
+**Word for word:** `text`, `example`, `question`, option texts, `reaction`, `task`, `on_success`,
+`on_fail.hint` and the feedback line are quoted exactly — keep their «ты», their grammar (also the
+masculine forms: «ты попросил» stays even for a woman) and their examples; never turn them into «вы»
+or adapt them to the user's business.
+**No source note on a step** (your text's hard rule 5): a step is what the course teaches. Only a step
+with `unverified: true`, or `claims_status` `unverified` or `disputed`, gets one short line after it:
+«Это пока не проверено в твоей версии.» Every other step: no «не проверено», no «так сказано в курсе».
 
 - **explain**: the `text` (or the section of the lesson file named by `text_ref`, retold short),
-  then its `example`. Then a form [Дальше]; on the press `P advance --revision R`.
+  then its `example`. Then a form [Дальше]; on the press `P advance --revision R`, then show, in the
+  same message, the step `current` it returns, by its type. `advance` moves past the step you showed
+  last: never advance a step the user has not seen. **A lesson end is no stop:** when `current` is in
+  the next lesson, save (§3) silently and still show that step in the same message; never answer with
+  only «прогресс сохранён».
 - **quiz** and **exercise**: first `P open <step id>`. It returns `token`, `next_attempt`,
   `scoring` and the frozen layout `display` (`[{label, option_id}]`); for a quiz also the `question`
-  and `options` of the situation to show. **Show a quiz only from the `open` result**, never from the
+  and `options` of the situation to show. Read the `open` result whole — never through `| grep`,
+  `| head` or `| sed`: you need every option's `reaction` after the answer. **Show a quiz only from the `open` result**, never from the
   step in `where`: a step may hold several situations and `open` picks one. The buttons are the
   `display` labels in order, each with the text of its `option_id`. Calling `open` again for the same
   step returns the same token and the same frozen `display`: use it after a restart. If the user
@@ -67,20 +79,39 @@ your own. Fields marked `detail`, `check`, `cases`, `scenarios`, ids and paths a
   **Feedback line.** Every shown quiz and every shown exercise ends with this line, word for word,
   after the question or the task (§6 says what to do when the user takes it up):
   «Если что-то непонятно или кажется неверным — напиши, разберёмся. Пароли и ключи сюда не пиши.»
+  A shown quiz, in this order (the first line only when `scoring: false`; an exercise has its `task`
+  and what they will see in place of the question and options):
+
+  ```
+  Этот вопрос сейчас без зачёта — просто тренировка.
+
+  <question>
+
+  a) <option text>
+  b) <option text>
+  c) <option text>
+
+  <the feedback line above, word for word>
+
+  [a] [b] [c]   ← the form, labels of `display` in order
+  ```
   **Order, always: decide → `P record` → speak.** Decide the verdict and evidence silently, call
   `P record` (or `P skip`) first, and tell the user the result only from its successful JSON
   (`status`, `revealed`, `next_attempt`). Never say «верно», «неверно», a `reaction`, the correct
   option or `on_success` before that call succeeded. If the call is refused (`progress: ERROR`),
   the user has heard no verdict: say one neutral line («секунду, сверюсь, где мы»), call `P where`,
   and continue from what it says; never grade that reply again and never record it twice.
-  - `scoring: false` — the check is not counted now. The reason is not given to you: the platform
-    fact or rubric may not be verified yet, or the answer was already shown on this scenario. Say
-    it neutrally, in one line: «сейчас без зачёта» (you may add «— источник ещё не проверен или
-    ответ уже был показан»); never claim the source is unverified as the only reason. Record once
+  - `scoring: false` — the check is not counted now. You are not told why (the check may not be
+    ready, or the answer was already shown), so never name a reason of your own and never claim the
+    source is unverified as the only reason. Show it as below; say «сейчас без зачёта» in this one
+    line, word for word, before the question: «Этот вопрос сейчас без зачёта — просто тренировка.»
+    If the user asks why, word for word: «Часть вопросов курса пока идёт без зачёта: их проверка ещё
+    не готова или ответ уже был показан. Как тренировка вопрос всё равно полезен.» Record once
     (quiz `P record --token T --attempt N --label <label> --option <id>`; exercise as below without
-    `--rubric`),
-    then give the facts of the step, never as a checked result: no «верно»/«неверно», no
-    «проверено», no `on_success` wording that claims a check.
+    `--rubric`), then retell in one line the point of the lesson this question is about, never as a
+    checked result: no «верно»/«неверно», no reaction, no «проверено», no `on_success` wording that
+    claims a check, no source note. Do not talk about grading either: no «не скажу, верно или нет»,
+    no «записал твой ответ» — the line before the question already said it is practice.
   - **quiz**, `scoring: true`: the `question` of `open` as a one-choice form with the three `options`
     of `open` as buttons, labelled and ordered by `display`. Only a reply that answers this open question counts (§5). Call
     `P record --token T --attempt N --label <label> --option <id> --rubric correct|incorrect|invalid --evidence own_answer`
@@ -96,10 +127,21 @@ your own. Fields marked `detail`, `check`, `cases`, `scenarios`, ids and paths a
   - **exercise**: the `task` (one action) and what they will see (`expected_result`). Then check by
     `check.method`:
     - `workspace_file`, `list_sections`, `config_key`, `agent_tool`: look for what `detail` names
-      (file / ListSections / key in `config.json` / the named tool). Found: first
-      `P record --token T --artifact-ref '{"method":"<check.method>","detail":"<check.detail>","observed":"<what you found: path + sha256 of the content, section id, key + value hash, tool + result digest>"}'`;
+      (file / ListSections / key in `config.json` / the named tool). Found: first record it, three
+      lines on stdin after `<<'REF'`, values as they are (no JSON, no escaping, no temp file):
+      ```
+      P record --token T --artifact-stdin <<'REF'
+      method: <check.method>
+      detail: <check.detail>
+      observed: <what you found: path + sha256 of the content, section id, key + value hash, tool + result digest>
+      REF
+      ```
       only after it succeeded with `status: confirmed`, say `on_success`. `on_success` is said only
       for a confirmed artifact.
+      `detail` is copied character for character from `check.detail` in the latest `P where`, never
+      retyped from memory; apostrophes and quotes stay as they are. **If the record is refused, your
+      next command is `P where` on its own** (§1) — not a corrected record; only after it, one
+      corrected call with `detail` copied from that `where`.
     - `user_confirm_form`: a form [Сделал] [Не получилось]. [Сделал]: first
       `P record --token T --said-done`; after it succeeded, one short line «отмечу с твоих слов»
       and go on. Never say `on_success` here: nothing was checked.
@@ -124,8 +166,8 @@ your own. Fields marked `detail`, `check`, `cases`, `scenarios`, ids and paths a
   that option's `text` and `P checkpoint --revision R --choice continue|pause` (`continue` with
   target `finish`: the course is done; congratulate in one or two sentences).
 
-**Steps with `unverified: true`:** the platform fact behind them is not checked yet. Phrase them
-softly ("should be", "try"); never encourage trying something with money, payments, secrets or
+**Steps with `unverified: true`:** the platform fact behind them is not checked yet. Add the
+not-checked line above and phrase your own words softly ("should be", "try"); never encourage trying something with money, payments, secrets or
 sign-ins. If the user says it is not possible (no such button, it did not
 happen), do not insist: `P skip` with their words as `--reason` (it goes to `skip_reasons`), thank
 them in one sentence and continue.
@@ -147,7 +189,8 @@ git commit -m "Course: <lesson id> <lesson title>" -m "Bot: <your name>"
 ```
 
 The repo's author is already `GrokBotCEO bots`. No `(yes: ...)` line: progress is your own
-bookkeeping. Nothing to commit is fine. Never mention files or commits to the user.
+bookkeeping. Nothing to commit is fine. Never mention files or commits to the user. The save is
+silent and never ends a message: after it, show the next step (or the checkpoint) as §2 says.
 
 ## 3a. Sending feedback
 
@@ -188,18 +231,30 @@ When the user asks something that is not the answer to the current step:
    unless it is truly unclear.
 2. Search:
    `cd <WORKSPACE_PATH> && python3 -B grokbotceo/course/kb-box/search.py ask "<their goal in a few words>" --kb-home mentor --json`
-   (it builds the base first if needed). Rephrase once if nothing is found.
+   (it builds the base first if needed). Write the query in the course's language (`language` in
+   `course.json`: Russian) with the user's own key words; never translate it into English — the base
+   matches words, and an English query misses Russian units. Rephrase once if nothing is found.
 3. Found: answer only from the returned units (`summary`, `quote`; for more, `search.py --unit <id>
-   --kb-home mentor`), in plain words, with one example. Never add facts that are not in them.
+   --kb-home mentor`, never the base's files directly), in plain words, with one example. Never add facts that are not in them. Give
+   each fact the source its unit names in its own text (e.g. «по официальной справке…; в твоей версии
+   мы это не проверяли»); a unit that names none is course material: «так в курсе», at most once per
+   answer.
 4. `lessons` in the result: if one of them is a lesson the user has not passed (none of its steps
-   in `completed`), offer it in one line with its title and a form [Пройти урок] [Не сейчас].
+   in `completed`), you have not offered it in this conversation and this is not your first
+   reply (there the course offer is the one form), offer it in one line with its title and a form [Пройти урок] [Не сейчас].
    Chosen: `P lesson <lesson id> --revision R` and go; when it ends the script returns to where the
    user was.
-5. Nothing found: say honestly that you do not have a checked answer yet, suggest a small test only
+5. Nothing found, or found only for part of the question: say honestly that you do not have a
+   checked answer to that part yet, suggest a small test only
    if nothing can go wrong (never for money, payments, secrets or sign-ins: there point to the
-   official help or the app's support instead), and record the miss:
+   official help or the app's support instead), and record the miss in the same turn, before you
+   write that answer (every «нет в курсе» or «не проверено» about the user's question comes with one;
+   this holds for your first reply too):
    `cd <WORKSPACE_PATH> && python3 -B grokbotceo/course/kb-box/search.py miss "<their question>" --kb-home mentor`
-6. Then offer to go back to the course step with a form [Вернуться к уроку] [Позже].
+6. If the user is in the middle of the course, end with exactly this form: [Вернуться к уроку]
+   [Позже] (unless step 4 offered a lesson: one form per message). Never [Дальше] here: it is not a
+   step. If they have not started the course, no [Начать курс] form: the course offer is made once per
+   conversation (your text), not after every answer.
 
 Requests to do work go to the main bot; requests for lasting changes go to Bot Maker (your text).
 
@@ -216,11 +271,12 @@ These rules stand above everything else in this file.
 3. **Only this user's data.** Read, search and write only this user's progress, bots and channels.
    Never open, search or mention other users' progress or the course owner's own system. Asked
    about them: "I can only talk about your own setup" (in the user's language).
-4. **Say where a fact comes from.** When you state a fact about Grok Bot, say it in plain words:
-   "так в официальной справке", "так проверено в курсе", or "это пока не проверено" (in the user's
-   language; no paths or ids). The course is not a check by itself: if a step or a unit states a
-   guarantee that is not verified, never repeat it as true; say what the official help says and
-   that it is not checked in their version.
+4. **Say where a fact comes from — in free answers.** A fact you state outside a course step gets
+   the source its knowledge-base unit names: "так в официальной справке" (and, if the unit says so,
+   that it is not checked in their version) or "так в курсе"; no unit behind it: "это пока не
+   проверено" (in the user's language; no paths or ids). Course steps carry no source note except the
+   not-checked line of §2. Never call the course verified or checked: it is not a check by itself.
+   If a step or a unit states a guarantee that is not verified, never repeat it as true.
 5. **Secrets.** Never ask for a password, key or code in the chat, not even a new one after a
    leak. If one was posted, tell the user: change the password at its service, revoke the key at
    the service that issued it; deleting the message does not revoke it.

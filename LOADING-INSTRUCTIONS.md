@@ -5,21 +5,26 @@ Follow the steps in order. Do not add steps. Talk to the user in their language,
 words: one idea and at most one question per message; no technical words (git, repo, commit,
 GitHub, config.json, paths, payload) unless the user asks.
 
-This release installs stage 1 only, the core:
+This release installs:
 
 - **the user's main bot is extended, not replaced.** You do not create a new main bot. You add
   the GrokBotCEO block to the user's main bot (normally you, the bot running this install) with
   `UpdateAgent`. Its name stays;
-- **Bot Maker** and **Mentor** are created;
+- five bots are created: **Bot Maker**, **Mentor**, **Reminder**, **Translator** and **Monitor**
+  (each named in the user's language, except Bot Maker);
 - the **#Improvements channel** is created, named in the user's language with a leading `#`
-  (`#Improvements`, `#Улучшения`); members: the user, the main bot, Bot Maker;
-- a git repo in the workspace mirrors the user's system. No routines are set up.
+  (`#Improvements`, `#Улучшения`); members: the user, the main bot, Bot Maker. No other bots join it;
+- a git repo in the workspace mirrors the user's system;
+- two routines, **only if the user chooses "Yes, with routines"** in the plan: Reminder's morning
+  reminders and Monitor's weekly report. Each bot creates its own routine (step 8a); you never
+  create a routine yourself.
 
 ## Contract
 
 ```
 fetch → capability check → find the main bot → explain → config.json → plan → user "yes"
-      → build (script) → create Bot Maker, Mentor → write checks
+      → build (script) → create Bot Maker, Mentor, Reminder, Translator, Monitor → write checks
+      → routines, only after "Yes, with routines" (ask Reminder and Monitor)
       → create the #Improvements channel → extend the main bot → write check
       → bots/core/, channels/, VERSION → Mentor's knowledge base (script) → first commit
       → offer a copy on the user's computer
@@ -28,22 +33,24 @@ fetch → capability check → find the main bot → explain → config.json →
 
 **Stop only at:** already installed (step 1), missing capability (step 2), user says no (step 6),
 build error (step 7), CreateAgent error (step 8). These are **not** stops: a write check that
-cannot be done (mark it `NOT VERIFIED`), a failed channel (step 9), a failed extension of the main
-bot (step 10), a failed build of Mentor's knowledge base (step 11). Tell the user in one line and
-continue.
+cannot be done (mark it `NOT VERIFIED`), a routine request that fails (step 8a), a failed channel
+(step 9), a failed extension of the main bot (step 10), a failed build of Mentor's knowledge base
+(step 11). Tell the user in one line and continue.
 
-**Questions to the user: exactly two in the whole install.** The "yes" to the plan (step 6) and
-the copy offer (step 13). Everything else you decide yourself: version, main bot, names, folders.
+**Questions to the user: exactly two in the whole install.** The answer to the plan (step 6: with
+or without routines, or no) and the copy offer (step 13). Everything else you decide yourself: version, main bot, names, folders.
 If you cannot decide, take the safe default (skip that part; Bot Maker can do it later), say so in
 one line and continue. A question the user cannot answer at once is where they give up.
 
 **Forms.** Show both questions as a platform form: answer buttons the user taps, worded in the
-user's language (for example `Да` / `Нет`). Use the platform's tool for answer options; find it
+user's language (for example `Да, с рутинами` / `Да, без рутин` / `Нет` in step 6, `Да` / `Нет`
+in step 13). Use the platform's tool for answer options; find it
 with GetDynamicTools in step 2 (its name is not verified in this release). If there is no such
 tool, end the question with one short line listing the answers in the user's language.
 
 **Never:** ask for secrets in chat; create a bot not in the approved plan; create a second main
-bot; create or turn on a routine; send a message on the user's behalf; write inside `grokbotceo/`
+bot; create or turn on a routine yourself, or ask a bot for one the user did not choose (step 8a);
+send a message on the user's behalf; write inside `grokbotceo/`
 (the release copy); send `config.json` anywhere other than the user's own computer (step 13); add
 a git remote or push.
 
@@ -57,19 +64,24 @@ a git remote or push.
   local-copy.json          optional: {"path": ...} of the read-only copy on the user's computer
   VERSION                  installed GrokBotCEO version
   bots/core/main-grok/     the user's main bot: prompt.md, previous.md, agent.json
-  bots/core/<bot>/         bot-maker, mentor as installed: prompt.md, agent.json
+  bots/core/<bot>/         bot-maker, mentor, reminder, translator, monitor as installed:
+                           prompt.md, agent.json
   bots/my/<bot>/           bots the user makes through Bot Maker
   bots/marketplace/<bot>/  copies of imported bots (name and text only)
   channels/<slug>.md       one file per channel: name, id, members, purpose
   mentor/progress.json     the user's place in Mentor's course; Mentor writes and commits it
   mentor/kb/               Mentor's knowledge base, built from grokbotceo/course/; derived, not committed
   mentor/kb-user/          the user's records for that base (questions with no answer); committed by Mentor
+  data/reminder/           Reminder's tasks (tasks.jsonl); written by Reminder
+  data/monitor/            Monitor's weekly numbers and proposals log; written by Monitor
   build/                   compiled payloads; safe to delete; not committed
 ```
 
 `bots/core/<bot>/prompt.md` is always the exact text the bot runs on. `agent.json` is
 `{"agent_id": "...", "check": "VERIFIED|NOT VERIFIED|MISMATCH", "version": "<VERSION>", "edited": false}`;
-for `main-grok` it also has `"mode": "extended"`, and `"check"` may be `NOT APPLIED` (step 10).
+for `main-grok` it also has `"mode": "extended"`, and `"check"` may be `NOT APPLIED` (step 10);
+for `reminder` and `monitor` it also has `"routine"`: `"not chosen"`, `"asked"` or `"failed"`
+(step 8a).
 `bots/core/main-grok/previous.md` is the main bot's text before the install, kept for rollback.
 
 ## 1. Fetch the release
@@ -90,13 +102,13 @@ Check with GetDynamicTools and one harmless shell command that you have:
 
 | Capability | Needed for | If missing |
 |---|---|---|
-| `CreateAgent` (`name`, `description`, `section_id`) | creating Bot Maker and Mentor | **stop**, tell the user |
+| `CreateAgent` (`name`, `description`, `section_id`) | creating the five bots | **stop**, tell the user |
 | reading and writing files in the workspace | config, build, repo | **stop**, tell the user |
 | running `python3` | build script, write check | **stop**, tell the user |
 | running `git` | the repo mirror | **stop**, tell the user |
 | `UpdateAgent` (`agent_id`, `description`) | extending the main bot (step 10) | optional: the main bot is not extended; say so in the plan |
 | `CreateChannel` | the #Improvements channel (step 9) | optional: no channel; Bot Maker then agrees changes in its own chat |
-| `SendToAgent` | bots passing change requests on | optional: bots then tell the user what to say to Bot Maker |
+| `SendToAgent` | bots passing change requests on; asking Reminder and Monitor for their routines (step 8a) | optional: bots then tell the user what to say to Bot Maker; routines: the user gets the sentence to send each bot |
 | a tool for answer options (buttons or checkboxes); name not verified | the two questions (steps 6, 13) as forms | optional: one short line listing the answers |
 | `ListSections` | not used at install: bots cannot create sections; Mentor teaches the user later | — |
 | running commands on the user's computer and copying files to it (`CopyFromBox`), through the Grok Bot desktop app | the optional copy (step 13) | optional: do not offer the copy; say it needs the desktop app |
@@ -130,18 +142,22 @@ Remember its `agent_id` and name for steps 6 and 10.
 ## 4. Explain
 
 In 3–5 short sentences, in plain words: what will be added (the main bot learns GrokBotCEO and
-keeps its name; two new bots, Bot Maker and Mentor; a channel called #Improvements, in the user's
-language (for example #Улучшения), where changes are agreed; a record of all bots with the history of every change, kept on the bot computer), and that
-nothing is created or changed before the user's "yes".
+keeps its name; five new bots: Bot Maker, Mentor, Reminder, Translator, Monitor; a channel called
+#Improvements, in the user's language (for example #Улучшения), where changes are agreed; a record
+of all bots with the history of every change, kept on the bot computer), and that nothing is
+created or changed before the user's "yes".
 
 ## 5. Write config.json
 
-Stage 1 uses only the keys marked **stage 1** in `grokbotceo/config.schema.md`:
+Use only the keys marked **stage 1** in `grokbotceo/config.schema.md`:
 
 - `WORKSPACE_PATH` — the absolute path of this workspace. Fill it in yourself.
 - `BOT_MAKER_BOT` — `Bot Maker`, the name in `grokbotceo/bots/bot-maker/profile.json`. Do not ask.
 - `MENTOR_BOT` — `Mentor`, or the same word in the user's language (for example `Ментор`). It is
   the name the user sees in the sidebar. Do not ask.
+- `REMINDER_BOT`, `TRANSLATOR_BOT`, `MONITOR_BOT` — `Reminder`, `Translator`, `Monitor`, or the
+  same words in the user's language (for example `Напоминальник`, `Переводчик`, `Монитор`). The
+  names the user sees in the sidebar. Do not ask.
 
 `IMPROVEMENTS_CHANNEL_ID` (**stage 1 (runtime)**) is added in step 9, after the channel exists.
 Bots read it from `config.json` when they need it; it is never built into their texts.
@@ -157,24 +173,35 @@ Show the plan, one short line each, in this order:
    (step 3), name it: "I will add GrokBotCEO to <name> (your main bot); its name stays." If it
    could not be found, or `UpdateAgent` is missing, say instead that this part is skipped for now.
 2. Create **Bot Maker**: makes and changes your bots.
-3. Create **Mentor** (the name from `MENTOR_BOT`): shows you around and answers how things work.
-4. Create a channel called **#Improvements** (in the user's language, for example **#Улучшения**):
+3. Create **Mentor** (the name from `MENTOR_BOT`): a short course on how Grok Bot and your system
+   work; answers how things work.
+4. Create **Reminder** (`REMINDER_BOT`): keeps your one-off tasks and reminds you on time.
+5. Create **Translator** (`TRANSLATOR_BOT`): translates a text or a post in two passes; never
+   publishes anything.
+6. Create **Monitor** (`MONITOR_BOT`): a weekly report on how your bots work, with proposals;
+   never changes anything.
+7. Routines, only if you choose "Yes, with routines": Reminder sends today's tasks every morning at
+   09:00, Monitor sends the weekly report every Sunday at 20:00 (your time). You can change or
+   stop them later in each bot's chat.
+8. Create a channel called **#Improvements** (in the user's language, for example **#Улучшения**):
    you, your main bot and Bot Maker; here Bot Maker agrees every change with you. (Skip the line
    if `CreateChannel` is missing.)
-5. A record of your bots with the history of every change, kept here on the bot computer; nothing
+9. A record of your bots with the history of every change, kept here on the bot computer; nothing
    leaves it.
-6. Afterwards I will ask if you want a copy on your own computer.
+10. Afterwards I will ask if you want a copy on your own computer.
 
-Ask: "Shall I do this?", as a form with two buttons in the user's language (for example `Да` /
-`Нет`). Create and change nothing before an explicit yes. Other bots in
-`grokbotceo/bots/` are not offered in this release.
+Ask: "Shall I do this?", as a form with three buttons in the user's language (for example
+`Да, с рутинами` / `Да, без рутин` / `Нет`). Either yes installs everything above; only
+"with routines" adds the two routines. Create and change nothing before an explicit yes. Remember
+the user's exact answer words for the commit (step 12) and the routine requests (step 8a). Nothing
+else is offered in this release.
 
 ## 7. Build (script, no model work)
 
 ```bash
 cd <WORKSPACE_PATH>
 python3 grokbotceo/scripts/bot-payload-compiler.py build \
-  --config config.json --bots bot-maker,mentor --out build/
+  --config config.json --bots bot-maker,mentor,reminder,translator,monitor --out build/
 python3 grokbotceo/scripts/bot-payload-compiler.py extend \
   --bot main-grok --agent-id <main bot agent_id> --config config.json --out build/
 ```
@@ -191,9 +218,9 @@ trailing whitespace, a blank line, then the main-bot block) and `build/main-grok
 read, or the block is already there), the main bot is not extended: one line to the user, continue.
 Skip `extend` if step 3 found no main bot.
 
-## 8. Create Bot Maker and Mentor
+## 8. Create the bots
 
-For each bot, in this order: `bot-maker`, `mentor`:
+For each bot, in this order: `bot-maker`, `mentor`, `reminder`, `translator`, `monitor`:
 
 1. Call `CreateAgent` with exactly the fields of `build/<bot>.payload.json`. Pass the text as is.
 2. Record the returned `agent_id`.
@@ -215,13 +242,38 @@ Mentor may write the first message in its own chat right after it is created; th
 If `CreateAgent` returns an error: stop creating, keep what was created, go to step 11 with the
 bots created so far and tell the user which bot failed and the error text.
 
+## 8a. Routines (only after "Yes, with routines")
+
+A bot creates its own routines; you never create one. Skip this step if the user chose "Yes,
+without routines" (record `"routine": "not chosen"` in step 11), or if Reminder or Monitor was not
+created.
+
+For `reminder`, then `monitor`, send the bot one message with `SendToAgent` (its `agent_id` from
+step 8), in English, exactly:
+
+```
+GrokBotCEO install: the user said yes to your routine "<routine>" in the install plan
+(yes: "<the user's exact answer words>"). Create that routine now, exactly as
+grokbotceo/bots/<bot>/routines.md describes it, once. If you do not know the user's timezone,
+create nothing yet and ask the user in your chat.
+```
+
+`<routine>` is `morning reminders` for Reminder and `weekly report` for Monitor. Send nothing else
+and ask for no other routine.
+
+- **Sent:** record `"routine": "asked"`. Print one line: `<bot> · routine asked`. Whether one bot
+  can ask another for a routine this way is **not verified**; the bot may answer in its own chat.
+- **Failed, or `SendToAgent` is missing:** record `"routine": "failed"`, print one line and keep
+  the sentence for the final message (step 14): the user opens that bot and says, in their
+  language, «Заведи утренние напоминания» (Reminder) or «Заведи еженедельный отчёт» (Monitor).
+
 ## 9. Create the #Improvements channel
 
 Call `CreateChannel` with the name: `#`, then the word for Improvements in the user's language,
 no space: `#Improvements` in English, `#Улучшения` in Russian. Bots can neither rename nor delete a
 channel, so the name must be right the first time. Members: the user, the main bot (step 3) and
-Bot Maker (step 8); no other bots (at most 6 bots fit in a channel; other bots send requests
-straight to Bot Maker). Use the argument names that GetDynamicTools showed; they are not verified
+Bot Maker (step 8); no other bots, not Mentor, Reminder, Translator or Monitor (at most 6 bots fit
+in a channel; other bots send requests straight to Bot Maker). Use the argument names that GetDynamicTools showed; they are not verified
 in this release.
 
 - **It worked:** add `"IMPROVEMENTS_CHANNEL_ID": "<the returned id>"` to `config.json` and write
@@ -260,8 +312,10 @@ user ("I could not add GrokBotCEO to your main bot; Bot Maker can do it later: t
 
 ## 11. Save what was installed
 
-- `bots/core/bot-maker/`, `bots/core/mentor/` (each bot created in step 8): `prompt.md` ← copy of
-  `build/<bot>.md`; `agent.json` ← `{"agent_id", "check", "version", "edited": false}`.
+- `bots/core/<bot>/` for each bot created in step 8 (`bot-maker`, `mentor`, `reminder`,
+  `translator`, `monitor`): `prompt.md` ← copy of `build/<bot>.md`; `agent.json` ←
+  `{"agent_id", "check", "version", "edited": false}`, plus `"routine"` (step 8a) for `reminder`
+  and `monitor`.
 - `bots/core/main-grok/` (if step 3 found the main bot):
   - `previous.md` ← copy of `build/main-grok.previous.md`;
   - `prompt.md` ← the text the bot runs on now: `build/main-grok.md` if step 10 worked, otherwise
@@ -328,10 +382,12 @@ user's language (for example `Да` / `Нет`). Neither answer is a stop.
 ## 14. Final message: hand the user to Mentor
 
 One short message in beginner's words, no technical words: what is ready (your main bot now
-knows GrokBotCEO; Bot Maker; Mentor; the #Improvements channel, by its real name), and anything that did not work, in
-one plain line each. One sentence: "Nothing changes without your yes." Then hand over:
-"Open Mentor in the list on the left; it will show you around." (Use the name from `MENTOR_BOT`.)
-Do not start the tour yourself.
+knows GrokBotCEO; Bot Maker; Mentor; Reminder, Translator and Monitor, by their real names; the
+routines if asked; the #Improvements channel, by its real name), and anything that did not work,
+in one plain line each (a routine request that failed: the sentence to send that bot, step 8a).
+One sentence: "Nothing changes without your yes." Then hand over: "Open Mentor in the list on the
+left and write: Let's start the course." (Use the name from `MENTOR_BOT`; the phrase in the user's
+language, for a Russian speaker «Начнём курс».) Do not start the course yourself.
 
 ---
 
@@ -358,8 +414,7 @@ disk.
 | `bots/<bot>/profile.json` | name and metadata; metadata is stripped by the build |
 | `bots/main-grok/block.md` | the block added to the user's main bot (no profile.json: not a new bot) |
 | `bots/_blocks/<name>.md` | shared blocks; `[[block:<name>]]` in a text is replaced by the block |
-| `bots/<bot>/routines.md` | optional bots only: routines, not used in this release |
-| `bots/<bot>/settings.json` | optional bots only: settings, not used in this release |
+| `bots/<bot>/routines.md` | reminder, monitor: the routine the bot may create after the user's yes (step 8a) |
 
 Editing files in the workspace does not change a live bot. A bot changes only through
 `UpdateAgent` (Bot Maker, updates).

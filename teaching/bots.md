@@ -7,24 +7,24 @@ A bot is an AI agent with one specific job: a prompt, profile, settings, and opt
 ## Key Principle: One Bot = One Job
 
 Each bot has a focused role. When the system owner (you) needs something done, it goes to the specialized bot:
-- News and posts → Readers
-- One-off tasks → Reminder bot  
+- One-off tasks and reminders → Reminder
+- Translations → Translator
+- How the bots work, weekly → Monitor
 - Bot/routine changes → Bot Maker
-- Coding tasks with local folder → Task Manager
+- How things work → Mentor
 
 ## Bot Structure
 
 Each bot folder contains:
 - `prompt.md` — Core instructions and anti-jobs
 - `profile.json` — Name and metadata, avatar (the persona lives only in `prompt.md`)
-- `settings.json` — Configuration flags
 - `routines.md` (optional) — Scheduled tasks this bot runs
 
 ## How Bots Communicate
 
 **Via SendToAgent:** One bot can send work to another bot with a message and context.
 
-**Via shared data:** Readers write to stats.db, Monitor reads from it.
+**Via shared data:** bots can share files in the workspace; Monitor, for example, keeps its weekly numbers in `data/monitor/`.
 
 **Via channels:** the core installs the #Improvements channel (you, your main bot and Bot Maker; at most 6 bots fit in a channel). Any bot that hears a request to change something for good sends it straight to Bot Maker; Bot Maker clarifies it there, shows each change as WHAT / WHERE / WHY and applies it only after your own yes.
 

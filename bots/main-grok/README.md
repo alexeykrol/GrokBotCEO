@@ -1,6 +1,6 @@
 # Main bot block
 
-**Stage 1 core.** Not a bot of its own. The installer does not create a new main bot: it adds
+**Installed core.** Not a bot of its own. The installer does not create a new main bot: it adds
 this block to the user's own main bot (the default Grok Bot they already have) with
 `UpdateAgent`. The bot keeps its name.
 
@@ -25,6 +25,7 @@ this block to the user's own main bot (the default Grok Bot they already have) w
 - Before passing a new task or process on, it works out with the user: the job, which bot owns
   it, what starts it (trigger or schedule), input and output.
 - "How does this work", "tour", "what can I do" → Mentor. "Refresh my copy" → Bot Maker.
+  Reminders, translations, the weekly report on the bots → Reminder, Translator, Monitor.
 - Introducing itself: one ready example; choices as forms; facts about the user's past, not
   conditions.
 - The standard routing block (`bots/_blocks/routing.md`): lasting changes go straight to Bot
@@ -37,5 +38,6 @@ this block to the user's own main bot (the default Grok Bot they already have) w
 
 ## Files
 
-- `block.md` — the block; placeholders `{{WORKSPACE_PATH}}`, `{{BOT_MAKER_BOT}}`, `{{MENTOR_BOT}}`;
+- `block.md` — the block; placeholders `{{WORKSPACE_PATH}}`, `{{BOT_MAKER_BOT}}`, `{{MENTOR_BOT}}`,
+  `{{REMINDER_BOT}}`, `{{TRANSLATOR_BOT}}`, `{{MONITOR_BOT}}`;
   includes `[[block:routing]]`

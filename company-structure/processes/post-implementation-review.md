@@ -1,6 +1,6 @@
 # post-implementation-review — Post Implementation Analysis
 
-**Owner:** Implementer  
+**Owner:** an analyst bot you make (this release does not install one)  
 **Trigger:** Event (receives routed post from readers)  
 **Autonomy Level:** L1 (analyzes, proposes, owner decides)
 
@@ -10,13 +10,13 @@ Analyze agent/tool/workflow posts for adoption potential. Evaluate what it does,
 
 ## Inputs
 
-- Routed post from Reader (post_id, cycle_no, article_path, channel)
+- A post sent on by a reader bot or by you (link, text, linked article)
 - Post text and linked article (if fetched)
 - Current system capabilities and gaps
 
 ## Outputs
 
-- Analysis posted to improvements channel
+- Analysis sent to Bot Maker, which shows any change in #Improvements
 - Recommendation: adopt/defer/reject + reasoning
 - Implementation plan if adopt recommended
 
@@ -26,4 +26,4 @@ Analyze agent/tool/workflow posts for adoption potential. Evaluate what it does,
 - Clear recommendation with evidence
 - Implementation plan with steps and verification
 
-Related: Implementer bot, improvements channel workflow
+Related: improvements channel workflow

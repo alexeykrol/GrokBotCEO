@@ -17,7 +17,7 @@ Weekly analysis of bot usage: calls, response times, load, failures. Propose imp
 ## Outputs
 
 - Weekly report with usage table, leaders, outsiders
-- Improvement proposals posted to improvements channel
+- Improvement proposals sent to Bot Maker, which shows each change in #Improvements
 - Historical data saved for trends
 
 ## Success Criteria

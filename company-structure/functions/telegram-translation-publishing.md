@@ -1,6 +1,6 @@
 # telegram-translation-publishing — Publish Approved Translation
 
-**Called by:** Translator bot (after owner approval)
+**Called by:** a publishing bot you make, after the owner's approval. The installed Translator never publishes: it gives you the final text and you publish it yourself.
 
 ## Purpose
 
@@ -25,4 +25,4 @@ Publish final approved translation to designated Telegram channel.
 - Link to published message returned
 - Record saved for tracking
 
-Related: Translator bot, two-pass translation workflow
+Related: two-pass translation workflow

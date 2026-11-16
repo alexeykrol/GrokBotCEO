@@ -19,7 +19,7 @@ Generate improvement proposals from weekly usage analysis: recurring failures â†
   - Bot affected
   - Evidence (session citations)
   - Proposed change text
-- Proposals posted to improvements channel
+- Proposals sent to Bot Maker, which shows each change in #Improvements and applies it only after the owner's yes
 - Proposals log updated
 
 ## Success Criteria

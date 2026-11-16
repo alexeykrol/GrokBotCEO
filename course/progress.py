@@ -11,6 +11,8 @@ revealed answers, versions, history, migration, backups, totals). Contract: cour
     progress.py record --token T --attempt N --label L --option ID [--rubric R --evidence E]   quiz answer
     progress.py record --token T --attempt N --rubric R --evidence E                     free check
     progress.py record --token T --artifact-ref JSON                                     exercise, auto-check
+    progress.py record --token T --artifact-stdin <<'REF'                                exercise, auto-check, no quoting:
+        method: M / detail: D / observed: O   (three lines on stdin, values as they are)
     progress.py record --token T --said-done                                             exercise, [Сделал]
     progress.py skip (--token T | --revision R) --reason TEXT
     progress.py advance --revision R                     after an explain step
@@ -880,6 +882,41 @@ def parse_artifact(ref, step):
     return {"method": art["method"], "detail": art["detail"], "observed": obs.strip()}
 
 
+ARTIFACT_KEYS = ("method", "detail", "observed")
+
+
+def read_artifact_lines(stream):
+    """--artifact-stdin: the artifact as three lines `method: …`, `detail: …`, `observed: …` (any order, each
+    once). A value is the rest of its line after `key: `, taken as it is: no shell quoting, no JSON escaping,
+    so an apostrophe or a double quote is just itself. Returns the same JSON text --artifact-ref takes, so
+    parse_artifact applies the very same checks (method, detail character for character, observed)."""
+    buf = getattr(stream, "buffer", None)
+    raw = buf.read(16 * 1024 + 1) if buf is not None else stream.read(16 * 1024 + 1)
+    if len(raw) > 16 * 1024:
+        raise ContractError("--artifact-stdin: input is larger than 16 KiB")
+    if isinstance(raw, bytes):
+        try:
+            raw = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            raise ContractError("--artifact-stdin: input is not UTF-8")
+    art = {}
+    for line in raw.split("\n"):
+        line = line.rstrip("\r")
+        if not line.strip():
+            continue
+        key, sep, value = line.lstrip().partition(": ")
+        if not sep or key not in ARTIFACT_KEYS:
+            raise ContractError("--artifact-stdin: each line is `method: …`, `detail: …` or `observed: …`; "
+                                f"got {line[:60]!r}")
+        if key in art:
+            raise ContractError(f"--artifact-stdin: {key!r} given twice")
+        art[key] = value
+    missing = [k for k in ARTIFACT_KEYS if k not in art]
+    if missing:
+        raise ContractError(f"--artifact-stdin: missing {missing}")
+    return json.dumps(art, ensure_ascii=False)
+
+
 def finish_attempt(p, course, chk, sid, entry, close):
     chk["history"].append(entry)
     cur = {"status": entry["status"], "evidence": entry["evidence"], "attempt": entry["attempt"]}
@@ -902,6 +939,11 @@ def finish_attempt(p, course, chk, sid, entry, close):
 
 
 def cmd_record(args, course, store):
+    if getattr(args, "artifact_stdin", False):
+        if args.artifact_ref:
+            raise ContractError("give the artifact once: --artifact-ref or --artifact-stdin, not both")
+        args.artifact_ref = read_artifact_lines(sys.stdin)   # read before the lock; same checks as --artifact-ref
+
     def fn(p):
         o = p.get("open")
         if not o or args.token != o["token"]:
@@ -2028,6 +2070,8 @@ def build_parser():
     sp.add_argument("--rubric")
     sp.add_argument("--evidence")
     sp.add_argument("--artifact-ref")
+    sp.add_argument("--artifact-stdin", action="store_true",
+                    help="read the artifact from stdin as lines method: / detail: / observed: (no quoting)")
     sp.add_argument("--said-done", action="store_true")
     sp.add_argument("--message-id")
     sp = common(sub.add_parser("skip"))

@@ -1,67 +1,42 @@
 # Monitor
 
-**Role:** Weekly reports on bot usage, proposes improvements
+**Installed bot.** A weekly report on how the user's bots are used, which are slow or heavy, and
+proposals to improve them. It reports; it never changes anything. Its own bot with its own name in
+the sidebar (`{{MONITOR_BOT}}` from `config.json`: `Monitor`, or the same word in the user's
+language).
 
-**Key responsibility:** Analyze bot performance and propose actionable improvements based on actual usage data
+## What it does
 
-## What Monitor Does
+- Reads each bot's week (`ReadTranscript`) and the shared bot computer (uptime, memory, disk).
+- Report: a table per bot (messages and runs, response time median / max, load, change vs last
+  week), the busiest, slowest and heaviest bots, candidates to merge or delete; every number with
+  its source; "Open questions" and "Guesses and gaps" at the end.
+- Proposals: recurring failures, repeated requests (skill candidates), repeated instructions (rule
+  candidates). It sends them to Bot Maker (`SendToAgent`), which shows each change in #Improvements
+  and applies it only after the user's yes. Monitor is not a member of #Improvements.
+- Keeps its numbers in `data/monitor/` in the user's workspace (`<YYYY-Www>.json`,
+  `proposals.jsonl`).
+- Weekly report routine (`weekly report`, Sunday 20:00 in the user's timezone): created only after
+  the user's yes, in the install plan ("Yes, with routines") or in Monitor's chat later. See
+  [routines.md](routines.md).
+- Carries the standard routing block (`bots/_blocks/routing.md`).
 
-- Generates weekly report on all bots (usage, response times, load)
-- Identifies recurring failures and proposes fixes
-- Detects repeated requests that could become skills
-- Tracks acceptance rate of past proposals
-- Posts improvement proposals to review channel
-- Maintains historical data for trend analysis
+## Honest limits
 
-## Anti-Jobs
+Per-bot CPU and memory do not exist (one shared computer; models run on the server), and token or
+billing use per bot is not visible: Monitor points to Settings → Usage. Whether `ReadTranscript` is
+available on every account is not verified; without it Monitor says so and reports what it can read.
 
-Monitor does NOT:
-- Change, pause, or delete bots or routines (only reports)
-- Quote conversation content (only counts, timings, labels)
-- Edit prompts or files (except own data in {{MONITOR_DATA_PATH}})
-- Post anywhere except improvements channel
-- Invent numbers it can't source from transcripts or tools
+## Anti-jobs
+
+- Never changes, pauses or deletes bots, skills or routines (only its own routine, on request).
+- Never quotes the user's conversations beyond counts, timings and short labels.
+- Writes only to `data/monitor/`; sends only to the user and Bot Maker.
+- Never asks for passwords, tokens or keys.
 
 ## Files
 
-- `profile.json` — Bot name and metadata (persona is in `prompt.md`)
-- `prompt.md` — Detailed measurement and reporting instructions
-- `routines.md` — Weekly report schedule
-
-## Setup Notes
-
-1. **Timezone:** Replace `{{OWNER_TIMEZONE}}` with your actual timezone
-2. **Report schedule:** Adjust weekly report time to your preference
-3. **#Improvements channel:** Replace `{{IMPROVEMENTS_CHANNEL}}` placeholder
-4. **Data paths:** Replace `{{MONITOR_DATA_PATH}}` and `{{WORKSPACE_PATH}}` with your actual paths
-5. **Language:** Template uses Russian; adapt to your language
-
-## What Monitor Measures
-
-**Per bot:**
-- Usage: message count, routine runs
-- Response time: median and max (first reply, final reply)
-- Load: tool calls, background tasks, long runs
-
-**System-wide:**
-- Shared resources (CPU, memory, disk)
-- Funnel metrics (if you use readers with stats.db): `python3 scripts/reading-dedup-sort.py report --db <stats.db>` prints cycles, posts and registry counts per platform as JSON
-
-**Improvement proposals:**
-- Recurring failures (top 3 per bot)
-- Repeated requests (3+ times → skill candidate)
-- Repeated instructions (2+ times → prompt rule)
-- Proposal acceptance rate tracking
-
-## Report Format
-
-- Table: bot | calls | response time | load | vs last week
-- Leaders: most used, slowest, heaviest
-- Outsiders: candidates to merge or delete (0-1 calls)
-- Proposals section with citations (session links)
-- Open questions and gaps
-- Sources for every number
-
----
-
-**Status:** v0.1 template (sanitized from Russian private source)
+- `profile.json` — name only: `{{MONITOR_BOT}}`
+- `prompt.md` — the bot's full text; placeholders `{{MONITOR_BOT}}`, `{{WORKSPACE_PATH}}`,
+  `{{BOT_MAKER_BOT}}`; includes `[[block:routing]]`
+- `routines.md` — the routine it may create, and when

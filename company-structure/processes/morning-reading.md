@@ -1,6 +1,6 @@
 # morning-reading — Daily Morning Reading (Generic)
 
-**Owner:** Reader bots (Reader X, Reader Telegram)  
+**Owner:** reader bots you make, one per source (this release does not install any)  
 **Trigger:** `CRON_TZ={{OWNER_TIMEZONE}} {{MINUTE}} {{HOUR}} * * *` (daily morning, disabled by default)  
 **Autonomy Level:** L2 (reads and filters autonomously)
 
@@ -10,16 +10,16 @@ Daily filtering of new posts from subscribed sources (X bookmarks/feed, Telegram
 
 ## Inputs
 
-- X bookmarks and home feed (Reader X)
-- Telegram subscribed channels (Reader Telegram)
+- X bookmarks and home feed
+- Telegram subscribed channels
 - Shared relevance criteria ({{READING_FILTER_PATH}})
 - Last seen state ({{READING_DATA_PATH}}/state.json)
 
 ## Outputs
 
-- Scored posts in {{READING_DATA_PATH}}/stats.db, written by `scripts/reading-dedup-sort.py record-stats` (schema: `data-schemas/stats-db-schema.sql`, field `platform`)
-- Posts marked seen (`mark-seen`) only after the digest was delivered
-- Routed agent/tool posts to Implementer
+- Scored posts recorded in {{READING_DATA_PATH}}
+- Posts marked seen only after the digest was delivered
+- Agent/tool posts sent on to an analyst bot, if you have one
 - ONE digest to owner grouped by rubrics
 - Updated state.json with last seen IDs
 
@@ -28,6 +28,6 @@ Daily filtering of new posts from subscribed sources (X bookmarks/feed, Telegram
 - All new posts since last run scored
 - ★3+ posts with concrete benefit selected
 - Digest delivered (or silence if nothing new)
-- Stats recorded for Monitor analysis
+- Counts recorded so the weekly report can show them
 
 Related: [Reading filter protocol](../protocols/reading-filter.md)

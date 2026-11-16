@@ -1,8 +1,4 @@
 {
-  "name": "Monitor",
-  "title": "",
-  "avatarShape": "",
-  "avatarColor": "",
-  "harness": "temporal",
-  "_comment": "Remove 'serverId' before creating bot - use your actual server ID. Persona lives only in prompt.md (do not add a description field here)."
+  "name": "{{MONITOR_BOT}}",
+  "_comment": "Name only, from config.json (Monitor, or the same word in the user's language). The bot's text lives in prompt.md."
 }

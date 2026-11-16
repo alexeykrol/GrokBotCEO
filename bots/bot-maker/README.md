@@ -1,6 +1,6 @@
 # Bot Maker
 
-**Stage 1 core bot.** Creates and changes the user's bots on request, and keeps the record of
+**Installed core bot.** Creates and changes the user's bots on request, and keeps the record of
 every bot in the user's repo mirror.
 
 ## What it does
@@ -49,3 +49,8 @@ every bot in the user's repo mirror.
 
 Uses `scripts/bot-payload-compiler.py` (`compose`, `extend`) and `scripts/bot-mirror.py` (write
 check, marketplace copies, the archive for the copy on the user's computer) from the release.
+
+## Credits
+
+Bot Maker was made on the basis of the Bot Maker by Lauren Tan (poteto).
+<!-- TODO(owner): add the link to Lauren Tan's Bot Maker here. -->
