@@ -1,8 +1,9 @@
-# Course feedback events — contract v1 (course-feedback-v1)
+# Course feedback events — contract v1 (course-feedback-v1) and v2 (course-feedback-v2, §5)
 
 Source of truth for both sides: the student-side client (`release/course/progress.py`) and the receiver
 (`services/feedback-receiver`, endpoint `POST /v1/course-event`). Plan: `docs/design/release-0.3.0-plan.md`
-(main repo), sections C2–C4, C6. Any change here = new contract version.
+(main repo), sections C2–C4, C6. Any change here = new contract version. §1–§4 are v1 and stay readable;
+§5 lists only what v2 changes (design: `docs/design/feedback-protocol-v2.md`).
 
 ## 1. Local files (next to `progress.json`, in `mentor/`)
 
@@ -169,3 +170,64 @@ Server: stores text as data only; never executes it, never builds paths/commands
 not drop) text containing HTML/script tags, URLs, control characters, or leading `= + - @` (CSV
 formula). Flag = `flagged` column with reason codes; flagged rows are shown in quarantine in the admin
 summary. Admin HTML output is escaped; CSV export prefixes formula-leading cells with `'`.
+
+## 5. Contract v2 (course-feedback-v2)
+
+Everything in §1–§4 holds unless changed here. The contract in force for a recipient is the `data_set` of
+its last consent line: a v1 line keeps the v1 behaviour (answers and remarks, no envelope `contract`).
+
+**Sent data.** `remark` events only. `answer` events are still written locally (§3a) and exported, but a v2
+flush never sends them. Only the text the user wrote as a remark about the course is sent: never the rest of
+the chat, never quiz answers.
+
+**Consent** (`consent.jsonl`, scope `data_set: "course-feedback-v2"`). Decisions:
+
+| decision | written by | rule |
+|---|---|---|
+| `granted_at_install` | the install, `consent --decision granted_at_install [--participant-key K]` | only when the recipient has no consent line yet (a re-install or update never overrides a decision) |
+| `acknowledged` | Mentor, the course-start notice answered («ок» or going on) | once; never after `revoked` (it does not resume sending) |
+| `revoked` | «не отправляй» | stops sending at once |
+| `granted` | «снова отправляй» | resumes |
+
+`revoked` / `granted` keep the data set already in force for the recipient (none yet → v1, as before).
+Sending is allowed under `granted_at_install`, `acknowledged`, `granted`. `--recipient` defaults to the
+configured endpoint's host. `where.feedback` adds, for v2 only: `data_set`, `notice_due` (consent at install,
+notice not yet answered, not stopped) and `queued`.
+
+**Key file** — `~/.grokbotceo/course.env` (override: env `GROKBOT_COURSE_ENV`), outside `mentor/`, so
+it survives updates. Lines `NAME=value`: `GROKBOT_INSTALL_ID`, `GROKBOT_SEND_TOKEN`, `GROKBOT_PARTICIPANT_KEY`
+(the per-person key from the install link `/i/<token>`; stored only, not sent in v2). Created with mode 600
+(directory 700), tmp + fsync + rename; unknown or malformed lines are ignored. No command ever prints the token
+or the key. Under v2 the key file is the credential store: a flush uses its install id and token; an earlier
+registration found only in `identity.json` is copied there once. A key file that cannot be written is a note
+(`key_file: "failed"`), not an error; sending then goes on from `identity.json`. v1 never touches the key file.
+
+**Registration at install.** The install runs `consent --decision granted_at_install`, then one
+`flush --endpoint <configured endpoint>`: with no credentials this flush is the registration (`registered`,
+`key_file`), so the first remark is not spent registering. If it failed, the first remark's flush registers
+and the remark goes with the next flush.
+
+**Flush after each remark.** Mentor runs the flush right after every `remark` (and once at session start when
+`queued` > 0). Envelope `{"install_id", "events", "contract": "course-feedback-v2"}`. The v2 flush summary adds
+`data_set` and `delivered_ids` (ids marked delivered by this call: `accepted` or `duplicate`); Mentor thanks
+only when the remark's id is in it. The one-request-per-flush rule, the endpoint check, the deadline and every
+status of §3 are unchanged; the flush stays the only command that touches the network.
+
+**Queue.** A failed send (non-2xx, timeout, transport, busy) leaves the remark in the local queue and the next
+flush resends it. The queue is not a second file: `events.jsonl` holds every remark before any send, and
+`outbox-state.json` marks what was delivered or rejected; queued = remark lines in neither.
+`progress.py queue` prints `{"queued", "ids"}` (never text). Rejected remarks are not resent (§3).
+
+**Held remarks** (tech-requirements 22d). A remark written while the v2 decision in force is `revoked` gets
+`"held": true` in its local line when it is written, and `remark` prints `"held": true`. A held remark is never
+sent: no flush picks it, `queue` and `where.feedback.queued` do not count it, and «снова отправляй» (`granted`)
+covers only remarks written after it. The field never leaves the computer.
+
+**Installation ID** (22h). `progress.py whoami` prints `{"install_id": <id or null>}` from the key file, else
+from `identity.json` — never the send token or the participant key. Mentor shows it on «покажи мой ID».
+
+**Receiver.** The envelope field `contract` is optional: absent or `"course-feedback-v1"` → v1;
+`"course-feedback-v2"` → remarks only, any other type rejected per event as `field:type`; any other value →
+400 `validation` (`field: contract`), nothing written.
+
+Not in v2 yet: the fallback `GET /f/<key>?t=` (design §1) — not built.

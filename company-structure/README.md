@@ -1,6 +1,6 @@
 # Company Structure
 
-Processes, protocols, and functions that make up the GrokBotCEO operating system.
+Processes, protocols, and functions that make up the BotCEO operating system.
 
 ## Structure
 

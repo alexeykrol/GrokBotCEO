@@ -23,9 +23,14 @@ revealed answers, versions, history, migration, backups, totals). Contract: cour
     progress.py summary LEVEL                            LEVEL = all | S<n> | S<n>.L<nn>
     progress.py rollback --to MIGRATION_ID               operator only: back to the copy before a migration
     progress.py remark < JSON                            a learner's remark about the course (stdin, one object)
-    progress.py consent --decision granted|revoked --recipient HOST    the learner's sending decision
+    progress.py consent --decision D [--recipient HOST] [--participant-key K]    the learner's sending decision;
+                                                         D = granted | revoked (v1, or v2 stop/resume),
+                                                         granted_at_install | acknowledged (v2); HOST defaults
+                                                         to the configured endpoint's host
     progress.py flush [--endpoint URL]                   the ONLY network command: send pending feedback events
                                                          (needs consent; --endpoint required when one is configured)
+    progress.py queue                                    v2: remarks waiting to be sent (ids only, read-only)
+    progress.py whoami                                   the installation ID only (never the token or the key)
     progress.py export-feedback                          print feedback events as JSON lines (read-only)
     progress.py doctor                                   torn .jsonl lines, missing answer events
 
@@ -34,8 +39,10 @@ revealed answers, versions, history, migration, backups, totals). Contract: cour
     --course FILE   course.json (default: grokbotceo/course/course.json)
     --message-id ID (record, skip) a platform message id; each id is consumed once.
 
-Feedback events (course/EVENT-SCHEMA.md, course-feedback-v1): DIR/events.jsonl, DIR/consent.jsonl,
-DIR/outbox-state.json. Every other command is local: it never opens a connection, whatever the endpoint and
+Feedback events (course/EVENT-SCHEMA.md, course-feedback-v1 and v2): DIR/events.jsonl, DIR/consent.jsonl,
+DIR/outbox-state.json; v2 also the key file (env GROKBOT_COURSE_ENV, default ~/.grokbotceo/course.env,
+mode 600: install_id, send_token, participant key; never printed). The contract in force is the data set of
+the last consent line for the recipient: v2 sends remarks only. Every other command is local: it never opens a connection, whatever the endpoint and
 consent. `flush` is called explicitly (its own tool call), makes at most one request and prints a JSON
 summary (status delivered | nothing_pending | registered | pending | skipped | refused; see cmd_flush).
 Exit 0 for every summary except `refused` (exit 3: --endpoint missing or not the configured endpoint, nothing
@@ -1194,6 +1201,11 @@ def cmd_where(args, course, store):
     base, host, _ = endpoint_of(course)
     out["feedback"] = {"recipient": host, "endpoint": base,
                        "consent": consent_state(store, host) if host else None}
+    if host:
+        decision, ds, answered = consent_info(store, host)
+        if ds == DATA_SET_V2:                               # v2 adds what the runtime needs (EVENT-SCHEMA §5)
+            out["feedback"].update(data_set=ds, notice_due=not answered and decision in SENDING,
+                                   queued=len(queued_remarks(store)))
     return out
 
 
@@ -1291,6 +1303,16 @@ def cmd_rollback(args, course, store):
 # ---------------------------------------------------------------- feedback events (EVENT-SCHEMA.md)
 
 DATA_SET = "course-feedback-v1"
+DATA_SET_V2 = "course-feedback-v2"         # EVENT-SCHEMA §5: remarks only, consent at install, key file
+V1_DECISIONS = ("granted", "revoked")
+V2_DECISIONS = ("granted_at_install", "acknowledged", "granted", "revoked")
+SENDING = ("granted", "granted_at_install", "acknowledged")   # decisions under which flush may send
+NOTICE_ANSWERS = ("acknowledged", "granted", "revoked")       # v2: the course-start notice was answered
+KEY_FILE_ENV = "GROKBOT_COURSE_ENV"
+KEY_FILE_DEFAULT = os.path.expanduser("~/.grokbotceo/course.env")
+KEY_RES = {"GROKBOT_INSTALL_ID": re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"),
+           "GROKBOT_SEND_TOKEN": re.compile(r"[A-Za-z0-9_-]{16,256}"),
+           "GROKBOT_PARTICIPANT_KEY": re.compile(r"[A-Za-z0-9_-]{16,64}")}
 REMARK_KINDS = ("unclear", "wrong", "other")
 REMARK_FIELDS = ("source_msg", "kind", "text", "scope", "step", "scenario_id", "parent_id")
 REMARK_KEYS = REMARK_FIELDS + ("event_id",)
@@ -1657,23 +1679,76 @@ def cmd_remark(args, course, store):
         eid = event_id(cid, "remark-uuid:" + str(uuid.uuid4()), "remark")
         ev = {"id": eid, "type": "remark", "course_version": course.version, "release_id": course.release_id,
               "version_origin": "recorded", "at": now(), **r}
+        held = held_now(store, course)
+        if held:
+            ev["held"] = True               # written while stopped (v2 revoked): never sent, even after resume
         append_lines(store, store.events, [ev])
-        return {"id": eid, "written": True}
+        out = {"id": eid, "written": True}
+        if held:
+            out["held"] = True
+        return out
     finally:
         store.release()
+
+
+def held_now(store, course):
+    """True when the effective v2 consent is `revoked` (tech-requirements 22d): a remark written now stays local
+    for good. The recipient is the configured endpoint's host; with no endpoint, any recipient whose last line
+    is a v2 stop counts."""
+    host = endpoint_of(course)[1]
+    hosts = {host} if host else {(c.get("scope") or {}).get("recipient") for c in read_jsonl(store.consent)[0]
+                                 if isinstance(c.get("scope"), dict)}
+    for h in hosts:
+        if isinstance(h, str):
+            decision, ds, _ = consent_info(store, h)
+            if decision == "revoked" and ds == DATA_SET_V2:
+                return True
+    return False
 
 
 def recipient_ok(host):
     return isinstance(host, str) and 0 < len(host) <= 253 and re.fullmatch(r"[a-z0-9.-]+", host) is not None
 
 
+def consent_lines(store, host):
+    """Complete consent lines for this recipient of a known data set and decision, oldest first."""
+    out = []
+    for c in read_jsonl(store.consent)[0]:
+        sc = c.get("scope") or {}
+        if not isinstance(sc, dict) or sc.get("recipient") != host:
+            continue
+        ds, dec = sc.get("data_set"), c.get("decision")
+        if (ds == DATA_SET and dec in V1_DECISIONS) or (ds == DATA_SET_V2 and dec in V2_DECISIONS):
+            out.append((ds, dec))
+    return out
+
+
+def consent_info(store, host):
+    """-> (decision or "none", data set of the last line or None, v2 notice answered?)."""
+    lines = consent_lines(store, host)
+    if not lines:
+        return "none", None, False
+    answered = any(ds == DATA_SET_V2 and dec in NOTICE_ANSWERS for ds, dec in lines)
+    return lines[-1][1], lines[-1][0], answered
+
+
 def cmd_consent(args, course, store):
+    """The learner's sending decision, one appended line. v1: granted | revoked. v2 (EVENT-SCHEMA §5):
+    granted_at_install (written by the install, once: never over an earlier decision), acknowledged (the
+    course-start notice answered; never re-grants after a stop), and the stop / resume words as revoked /
+    granted, which keep the data set already in force (none yet -> v1, as before)."""
     host = (args.recipient or "").strip().lower()
+    if not host:
+        host = endpoint_of(course)[1] or ""
     if not recipient_ok(host):
-        raise ContractError("--recipient must be a host name (the course author's server)")
-    line = {"at": now(), "decision": args.decision,
-            "scope": {"data_set": DATA_SET, "recipient": host, "course_major": str(semver(course.version)[0])},
-            "course_version": course.version}
+        raise ContractError("--recipient must be a host name (the course author's server); "
+                            "none given and no endpoint configured")
+    pkey = getattr(args, "participant_key", None)
+    if pkey is not None:
+        if args.decision != "granted_at_install":
+            raise ContractError("--participant-key goes only with --decision granted_at_install")
+        if not KEY_RES["GROKBOT_PARTICIPANT_KEY"].fullmatch(pkey):
+            raise ContractError("--participant-key has an invalid format")
     store.acquire()
     try:
         raw = store.read()
@@ -1681,26 +1756,101 @@ def cmd_consent(args, course, store):
             p = parse(raw) if raw is not None else None
         except ContractError:
             p = None
+        decision, ds, answered = consent_info(store, host)
+        if args.decision in ("granted_at_install", "acknowledged"):
+            data_set = DATA_SET_V2
+        else:
+            data_set = ds or DATA_SET
+        write = True
+        if args.decision == "granted_at_install":
+            write = decision == "none"                      # a re-install or update never overrides a decision
+        elif args.decision == "acknowledged":
+            if ds != DATA_SET_V2:
+                raise ContractError("acknowledged needs the consent recorded at install (course-feedback-v2)")
+            write = not answered and decision in SENDING     # after «не отправляй» it stays stopped
         ensure_identity(store, p)                           # bootstrap before the first r030 file is written
-        append_lines(store, store.consent, [line])
+        if write:
+            line = {"at": now(), "decision": args.decision,
+                    "scope": {"data_set": data_set, "recipient": host,
+                              "course_major": str(semver(course.version)[0])},
+                    "course_version": course.version}
+            append_lines(store, store.consent, [line])
+        key_file = None
+        if pkey is not None:
+            key_file = "written" if write_key_file({"GROKBOT_PARTICIPANT_KEY": pkey}) else "failed"
+        decision, ds, answered = consent_info(store, host)
     finally:
         store.release()
-    return {"decision": args.decision, "recipient": host, "data_set": DATA_SET}
+    if data_set == DATA_SET and ds == DATA_SET:
+        return {"decision": args.decision, "recipient": host, "data_set": DATA_SET}
+    out = {"decision": decision, "recipient": host, "data_set": ds, "written": write,
+           "notice_due": ds == DATA_SET_V2 and not answered and decision in SENDING,
+           "endpoint": endpoint_of(course)[0]}             # for the install's flush --endpoint
+    if key_file:
+        out["key_file"] = key_file
+    return out
 
 
 def consent_state(store, host):
-    """The last complete consent line for this data set and recipient: granted | revoked | none."""
-    last = "none"
-    for c in read_jsonl(store.consent)[0]:
-        sc = c.get("scope") or {}
-        if isinstance(sc, dict) and sc.get("data_set") == DATA_SET and sc.get("recipient") == host \
-                and c.get("decision") in ("granted", "revoked"):
-            last = c["decision"]
-    return last
+    """The decision of the last complete consent line for this recipient (v1 or v2 data set): granted | revoked |
+    granted_at_install | acknowledged | none."""
+    return consent_info(store, host)[0]
 
 
 def effective_consent(store, host):
-    return consent_state(store, host) == "granted"
+    return consent_state(store, host) in SENDING
+
+
+def key_file_path():
+    return Path(os.environ.get(KEY_FILE_ENV) or KEY_FILE_DEFAULT)
+
+
+def read_key_file():
+    """-> {name: value} of the valid known lines of the key file; missing or unreadable -> {}."""
+    try:
+        text = key_file_path().read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return {}
+    out = {}
+    for line in text.splitlines():
+        name, sep, value = line.strip().partition("=")
+        if sep and name in KEY_RES and KEY_RES[name].fullmatch(value):
+            out[name] = value
+    return out
+
+
+def write_key_file(updates):
+    """Merge into the key file: created 0600 from the start (parent 0700), tmp + fsync + rename. Never printed.
+    -> True, or False (with a note) when it cannot be written; the caller goes on."""
+    path = key_file_path()
+    data = read_key_file()
+    data.update(updates)
+    body = "".join(f"{k}={data[k]}\n" for k in sorted(data)).encode("utf-8")
+    tmp = path.with_name(f".{path.name}.{secrets.token_hex(4)}.tmp")
+    try:
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        fd = os.open(tmp, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(body)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, path)
+    except OSError as e:
+        note(f"key file not written ({type(e).__name__})")
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        return False
+    return True
+
+
+def key_file_credentials():
+    k = read_key_file()
+    if k.get("GROKBOT_INSTALL_ID") and k.get("GROKBOT_SEND_TOKEN"):
+        return k["GROKBOT_INSTALL_ID"], k["GROKBOT_SEND_TOKEN"]
+    return None
 
 
 def endpoint_of(course):
@@ -1832,26 +1982,63 @@ def _post(url, body, token=None, deadline=None):
     return int(status_line), json.loads(data.decode("utf-8"))
 
 
-def _batch(events, install_id):
+def _envelope(install_id, events, contract=None):
+    body = {"install_id": install_id, "events": events}
+    if contract:
+        body["contract"] = contract
+    return body
+
+
+def _batch(events, install_id, contract=None):
     """At most BATCH events and an encoded body of at most BODY_MAX bytes; stop before exceeding."""
     out = []
     for e in events[:BATCH]:
-        if len(encode_body({"install_id": install_id, "events": out + [e]})) > BODY_MAX:
+        if len(encode_body(_envelope(install_id, out + [e], contract))) > BODY_MAX:
             break
         out.append(e)
     return out
 
 
-def _pending_count(store):
+def _pending(store, types=None):
+    """Events not yet delivered or rejected, in file order. types=("remark",) under v2."""
     st = load_outbox(store)
     done = set(st["delivered"]) | set(st["rejected"])
-    return len([e for e in read_jsonl(store.events)[0] if HEX32.fullmatch(str(e.get("id"))) and e["id"] not in done])
+    return [e for e in read_jsonl(store.events)[0] if HEX32.fullmatch(str(e.get("id"))) and e["id"] not in done
+            and (types is None or e.get("type") in types) and e.get("held") is not True]   # held: never sent
+
+
+def _pending_count(store, types=None):
+    return len(_pending(store, types))
+
+
+def queued_remarks(store):
+    """v2 queue (EVENT-SCHEMA §5): remark lines of events.jsonl not yet delivered or rejected. The queue is not a
+    second file: events.jsonl holds every remark before any send, outbox-state.json marks what went."""
+    return [e["id"] for e in _pending(store, ("remark",))]
+
+
+def cmd_queue(args, course, store):
+    """Read-only: the remarks waiting to be sent (ids only, never text)."""
+    ids = queued_remarks(store)
+    return {"queued": len(ids), "ids": ids}
+
+
+def cmd_whoami(args, course, store):
+    """Read-only (tech-requirements 22h, «покажи мой ID»): the installation ID from the key file, else from
+    identity.json; null before registration. Never the send token or the participant key."""
+    iid = read_key_file().get("GROKBOT_INSTALL_ID")
+    if not iid:
+        ident = _identity_from(store.identity) or _identity_from(store.identity_bak)
+        iid = ident.get("install_id") if ident else None
+    return {"install_id": iid if isinstance(iid, str) and iid else None}
 
 
 def cmd_flush(args, course, store):
     """EVENT-SCHEMA §3: the ONLY command that touches the network, called explicitly. At most one request:
     register when there is no install, else one batch. No retry inside. Always prints one JSON summary;
-    exit 0, except `refused` (exit 3); a broken installation is exit 2 (ContractError on stderr, no summary):
+    exit 0, except `refused` (exit 3); a broken installation is exit 2 (ContractError on stderr, no summary).
+    v2 (EVENT-SCHEMA §5): remarks only, envelope "contract", credentials from the key file, plus `data_set` and
+    `delivered_ids` in the summary; `registered` also reports `key_file`.
 
       status          meaning for the caller
       delivered       one batch went and was answered; `pending` may still be > 0 (the next flush sends more)
@@ -1904,6 +2091,11 @@ def cmd_flush(args, course, store):
             note("identity_lost: nothing is sent and no new identity is created; run doctor")
             return done("skipped", "identity_lost")
         res["pending"] = _pending_count(store)
+        v2 = bool(host) and consent_info(store, host)[1] == DATA_SET_V2
+        types, contract = (("remark",), DATA_SET_V2) if v2 else (None, None)
+        if v2:
+            res["data_set"], res["delivered_ids"] = DATA_SET_V2, []
+            res["pending"] = _pending_count(store, types)
         if refused:
             res["detail"] = refused
             return done("skipped", "endpoint_refused", "refused")
@@ -1915,18 +2107,26 @@ def cmd_flush(args, course, store):
             note("identity_lost: nothing is sent and no new identity is created; run doctor")
             return done("skipped", "identity_lost")
         ident = ensure_identity(store, p)
-        if not ident["install_id"] or not ident["send_token"]:
+        creds = None
+        if v2:
+            # v2: the key file (outside mentor/, survives updates) is the credential store; an earlier
+            # registration kept only in identity.json is copied there once
+            creds = key_file_credentials()
+            if creds is None and ident["install_id"] and ident["send_token"]:
+                creds = (ident["install_id"], ident["send_token"])
+                write_key_file({"GROKBOT_INSTALL_ID": creds[0], "GROKBOT_SEND_TOKEN": creds[1]})
+        elif ident["install_id"] and ident["send_token"]:
+            creds = (ident["install_id"], ident["send_token"])
+        if creds is None:
             res["action"] = "register"
             batch = None
         else:
-            st = load_outbox(store)
-            gone = set(st["delivered"]) | set(st["rejected"])
-            pending = [e for e in read_jsonl(store.events)[0] if HEX32.fullmatch(str(e.get("id"))) and e["id"] not in gone]
+            pending = _pending(store, types)
             res["pending"] = len(pending)
             if not pending:
                 return done("nothing_pending")
-            install_id, token = ident["install_id"], ident["send_token"]
-            batch = _batch(pending, install_id)
+            install_id, token = creds
+            batch = _batch(pending, install_id, contract)
             if not batch:
                 note("the first pending event does not fit one request; it stays pending")
                 return done("pending", "oversize")
@@ -1944,7 +2144,7 @@ def cmd_flush(args, course, store):
                 res["http_status"] = status
                 raise ValueError(f"register answered {status} without install_id/send_token")
         else:
-            status, body = _post(base + "/v1/course-event", {"install_id": install_id, "events": batch}, token)
+            status, body = _post(base + "/v1/course-event", _envelope(install_id, batch, contract), token)
             if status != 200 or not isinstance(body, dict):
                 res["http_status"] = status
                 raise ValueError(f"course-event answered {status}")
@@ -1971,6 +2171,10 @@ def cmd_flush(args, course, store):
             if ident is not None and not ident["install_id"]:        # the registration is added once
                 ident.update(install_id=body["install_id"], send_token=body["send_token"])
                 _write_identity(store, ident)
+                if v2:
+                    res["key_file"] = "written" if write_key_file(
+                        {"GROKBOT_INSTALL_ID": body["install_id"], "GROKBOT_SEND_TOKEN": body["send_token"]}) \
+                        else "failed"
                 return done("registered", None, "registered")
             return done("pending", "register_discarded")
         st = load_outbox(store)
@@ -1981,6 +2185,8 @@ def cmd_flush(args, course, store):
                 if eid in sent:
                     st["delivered"][eid] = {"at": at, "result": key}
                     res[key] += 1
+                    if v2:
+                        res["delivered_ids"].append(eid)
         for r in body.get("rejected") or []:
             if isinstance(r, dict) and r.get("id") in sent and r["id"] not in st["delivered"]:
                 st["rejected"][r["id"]] = {"at": at, "reason": str(r.get("reason"))[:64]}
@@ -2102,10 +2308,13 @@ def build_parser():
     sp.add_argument("--to", required=True)
     common(sub.add_parser("remark"))
     sp = common(sub.add_parser("consent"))
-    sp.add_argument("--decision", choices=("granted", "revoked"), required=True)
-    sp.add_argument("--recipient", required=True)
+    sp.add_argument("--decision", choices=V2_DECISIONS, required=True)
+    sp.add_argument("--recipient", help="the course author's host; default: the configured endpoint's host")
+    sp.add_argument("--participant-key", help="v2, with granted_at_install: the key from the personal install link")
     sp = common(sub.add_parser("flush"))
     sp.add_argument("--endpoint", help="the configured endpoint, verbatim from where.feedback.endpoint")
+    common(sub.add_parser("queue"))
+    common(sub.add_parser("whoami"))
     common(sub.add_parser("export-feedback"))
     common(sub.add_parser("doctor"))
     return ap
@@ -2114,7 +2323,9 @@ def build_parser():
 COMMANDS = {"migrate": cmd_migrate, "where": cmd_where, "open": cmd_open, "record": cmd_record,
             "skip": cmd_skip, "advance": cmd_advance, "checkpoint": cmd_checkpoint, "resume": cmd_resume,
             "notice": cmd_notice, "lesson": cmd_lesson, "summary": cmd_summary, "rollback": cmd_rollback,
-            "remark": cmd_remark, "consent": cmd_consent, "flush": cmd_flush, "export-feedback": cmd_export_feedback,
+            "remark": cmd_remark, "consent": cmd_consent, "flush": cmd_flush, "queue": cmd_queue,
+            "whoami": cmd_whoami,
+            "export-feedback": cmd_export_feedback,
             "doctor": cmd_doctor}
 # Only `flush` touches the network (EVENT-SCHEMA §3). Every other command is local, whatever the endpoint and
 # consent: it never spawns the request child and never opens a socket.

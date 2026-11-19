@@ -2,7 +2,7 @@
 
 ## What You Can Customize
 
-GrokBotCEO is designed as a template system. You're expected to adapt it to your work, not use it exactly as shipped.
+BotCEO is designed as a template system. You're expected to adapt it to your work, not use it exactly as shipped.
 
 ### 1. Schedules
 

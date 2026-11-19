@@ -1,8 +1,8 @@
-# Getting Started with GrokBotCEO
+# Getting Started with BotCEO
 
 **Version:** see [VERSION](VERSION) · **You need:** a Grok Bot account · **Time:** 20–30 minutes
 
-GrokBotCEO is a ready set of Grok Bot bots for running a business and a product. Your own main bot
+BotCEO is a ready set of bots for Grok Bot, for running a business and a product. Your own main bot
 learns the system; five new bots arrive: Bot Maker, Mentor, Reminder, Translator and Monitor; the
 #Improvements channel is where changes are agreed; a repo mirrors your system. Mentor then takes you
 through a short course, in small steps, that ends with your first own bot. You install it by
@@ -15,7 +15,7 @@ pasting one command into your Grok Bot chat. After that the bots are yours.
 ## 1. Paste this into your Grok Bot chat
 
 ```
-Install GrokBotCEO for me.
+Install BotCEO for me.
 
 Repository: https://github.com/alexeykrol/GrokBotCEO (latest release)
 Follow LOADING-INSTRUCTIONS.md from that release step by step. Do not improvise steps that are not there.
@@ -42,7 +42,7 @@ It shows the plan:
 
 | What | What it does |
 |---|---|
-| your main bot | not a new bot: it learns GrokBotCEO and keeps its name |
+| your main bot | not a new bot: it learns BotCEO and keeps its name |
 | Bot Maker (new) | creates and changes bots for you |
 | Mentor (new) | a short course on how Grok Bot and your system work; answers how things work |
 | Reminder (new) | keeps your one-off tasks and reminds you on time |

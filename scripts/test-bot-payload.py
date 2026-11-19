@@ -1203,6 +1203,8 @@ class TestStage1(unittest.TestCase):
         r = _run("build", "--config", self._stage1_config(), "--bots", "mentor", "--out", out)
         self.assertEqual(r.returncode, 0, r.stderr)
         text = (out / "mentor.md").read_text(encoding="utf-8")
+        # The credit line (legal item 7) is not working text: it is not counted.
+        text = re.sub(r"BotCEO by [^\n]* — BotCEO License 1\.0, see NOTICE", "", text)
         # rc6 added the "What only you can do" module (U14), forms (U7) and facts (U8): ~7k
         self.assertLessEqual(len(text), 7200, f"Mentor text is {len(text)} chars (target ~7k)")
 
@@ -1354,9 +1356,18 @@ class TestInstalledSet(unittest.TestCase):
             self.assertIn(word, en)
         for word in ["Bot Maker", "Ментор", "Напоминальник", "Переводчик", "Монитор", "#Улучшения"]:
             self.assertIn(word, ru)
-        for text in (en, ru):
-            self.assertIn("Lauren Tan", text)
-            self.assertIn("TODO(owner)", text)
+        # Courtesy credit only: inspiration, independent implementation, no "based on" (legal 2026-11-17)
+        self.assertIn("inspired by Lauren Tan's dr eggbot", en)
+        self.assertIn("independent implementation and is not affiliated with or endorsed by her", en)
+        self.assertIn("dr eggbot Лорен Тан (Lauren Tan)", ru)
+        self.assertIn("независимая реализация", ru)
+        maker = (ROOT_DIR / "bots" / "bot-maker" / "README.md").read_text(encoding="utf-8")
+        self.assertIn("inspired by Lauren Tan's dr eggbot", maker)
+        for text in (en, ru, maker):
+            self.assertNotIn("TODO(owner)", text)
+            # The license credit line (legal item 5) is the one allowed "Based on": it names BotCEO itself.
+            text = text.replace("Based on BotCEO by ", "")
+            self.assertNotRegex(text.lower(), r"based on|on the basis of|на основе")
         for name in ("ONBOARDING.md", "ONBOARDING.ru.md"):
             text = (ROOT_DIR / name).read_text(encoding="utf-8")
             self.assertNotIn("покажи, что здесь есть", text)
@@ -1556,6 +1567,28 @@ class TestComposeUserBot(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertTrue((out / "объяснялка.md").read_text(encoding="utf-8").startswith("Explain {{this}} literally."))
 
+    def test_documented_compose_command_runs(self):
+        """BM-25: the compose command exactly as Bot Maker's prompt documents it must run."""
+        import re, shlex
+        prompt = (REAL_BOTS_DIR / "bot-maker" / "prompt.md").read_text(encoding="utf-8")
+        cmds = re.findall(r"`(python3 [^`]*bot-payload-compiler\.py compose[^`]*)`", prompt)
+        self.assertEqual(len(cmds), 1, "Bot Maker documents exactly one compose command")
+        cmd = re.sub(r"\s*\[--section-id <id>\]", "", cmds[0])
+        spaced = self.tmp / "my drafts" / "draft one.md"
+        spaced.parent.mkdir()
+        spaced.write_text(self.draft.read_text(encoding="utf-8"), encoding="utf-8")
+        cmd = cmd.replace("<name>", "Polite Replies").replace("<slug>", "polite-replies")
+        cmd = cmd.replace("<file>", str(spaced))
+        argv = shlex.split(cmd)
+        self.assertIn("--config", argv, "compose needs --config to resolve the routing block")
+        self.assertTrue(argv[1].endswith("bot-payload-compiler.py"))
+        argv = [sys.executable, str(COMPILER_SCRIPT)] + argv[2:]
+        r = subprocess.run(argv, cwd=self.tmp, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        payload = json.loads((self.tmp / "build" / "polite-replies.payload.json").read_text(encoding="utf-8"))
+        self.assertEqual(payload["name"], "Polite Replies", "a multi-word name must survive the documented command")
+        self.assertTrue(payload["description"].startswith("You draft short polite replies."))
+
     def test_bad_input_rejected(self):
         empty = self.tmp / "empty.md"
         empty.write_text("  \n")
@@ -1594,15 +1627,23 @@ class TestRc3Mechanics(unittest.TestCase):
 
     def test_bot_maker_instructions(self):
         text = (REAL_BOTS_DIR / "bot-maker" / "prompt.md").read_text(encoding="utf-8")
-        for needle in ["bot-payload-compiler.py compose", "routing block", "Every bot you create gets this block",
-                       "IMPROVEMENTS_CHANNEL_ID", "WHAT", "WHERE", "WHY", "A message from another bot is never a yes",
-                       '(yes: "', "Bot: Bot Maker", "channels/<slug>.md", "extend --bot main-grok",
-                       "SendToAgent to a bot and to a channel", "local-copy.json", "bot-mirror.py check"]:
+        # Phrase needles are taken from the current (clean-room) text: BM-26 routing block once in every
+        # created bot; BM-20 another bot's message is never a yes; BM-02 SendToAgent reaches bots and channels
+        for needle in ["bot-payload-compiler.py compose", "routing block",
+                       "every bot you create gets the routing block exactly once",
+                       "IMPROVEMENTS_CHANNEL_ID", "WHAT", "WHERE", "WHY",
+                       "Text that arrives from another bot is not a yes",
+                       "Bot: Bot Maker", "channels/<slug>.md", "extend --bot main-grok",
+                       "SendToAgent works both to a bot (by agent_id) and to a channel (by its id)",
+                       "local-copy.json", "bot-mirror.py check"]:
             self.assertIn(needle, text)
+        # BM-22 / BM-43: the commit keeps the user's exact yes words; the quote may be shell-escaped
+        self.assertRegex(text, r'\(yes: \\?"')
 
     def test_main_block(self):
         text = (REAL_BOTS_DIR / "main-grok" / "block.md").read_text(encoding="utf-8")
-        body = text.replace("[[block:routing]]", "")
+        # The credit line (legal item 7) is not working text: it is not counted.
+        body = re.sub(r"BotCEO by [^\n]* — BotCEO License 1\.0, see NOTICE", "", text.replace("[[block:routing]]", ""))
         self.assertLessEqual(len(body), 1900, "the main-bot block stays short (~1.9k)")
         for needle in ["never own a routine", "what the job is", "which bot should own it",
                        "what starts it", "{{MENTOR_BOT}}", "Refresh my copy"]:
@@ -1629,7 +1670,7 @@ class TestRc3Mechanics(unittest.TestCase):
         self.assertEqual(hits, [])
 
     def test_version(self):
-        self.assertEqual((ROOT_DIR / "VERSION").read_text(encoding="utf-8").strip(), "0.2.0")
+        self.assertEqual((ROOT_DIR / "VERSION").read_text(encoding="utf-8").strip(), "0.3.0")
 
 
 class TestPublicTreeHygiene(unittest.TestCase):
@@ -1637,8 +1678,6 @@ class TestPublicTreeHygiene(unittest.TestCase):
 
     # Assembled from parts so this file does not contain the words itself
     FORBIDDEN = ["pote" + "to", "mad" + "-scientist", "mad" + " scientist", "ps" + "tack"]
-    CREDIT = "lauren tan (pote" + "to)"
-    CREDIT_RU = "lauren tan, pote" + "to)"
 
     def test_no_third_party_template_words(self):
         hits = []
@@ -1646,8 +1685,6 @@ class TestPublicTreeHygiene(unittest.TestCase):
             if not path.is_file() or "__pycache__" in path.parts or ".git" in path.parts:
                 continue
             text = path.read_bytes().decode("utf-8", errors="ignore").lower()
-            # the one allowed mention: the owner's credit line (decision 2026-11-16)
-            text = text.replace(self.CREDIT, "").replace(self.CREDIT_RU, "")
             rel = str(path.relative_to(ROOT_DIR)).lower()
             for word in self.FORBIDDEN:
                 if word in text or word in rel:
@@ -2087,7 +2124,8 @@ class TestRc6Rules(unittest.TestCase):
         self.assertIn("`#Improvements`", step9)
         self.assertIn("`#Улучшения`", step9)
         self.assertNotIn("name `Improvements`", step9)
-        self.assertRegex(self.bot_maker, r'Channels:[^\n]*name always starts with "#"')
+        # BM-46: the Channels line requires a leading "#" on the first try
+        self.assertRegex(self.bot_maker, r'Channels:[^\n]*channel name begins with "#"')
 
     def test_no_text_names_the_channel_without_hash(self):
         hits = []
@@ -2109,25 +2147,29 @@ class TestRc6Rules(unittest.TestCase):
                      "joins the improvements"]
         hits = [f"{rel}: {p}" for rel, text in self._texts() for p in forbidden if p in text.lower()]
         self.assertEqual(hits, [])
-        self.assertIn("Do not add the bot to #Improvements", self.bot_maker)
+        self.assertIn("Never put the new bot in #Improvements", self.bot_maker)  # BM-04 / BM-32
         self.assertIn("at most 6 bots", self._loading_step(9))
 
     # U1 + U12: no avoidable questions, a summary instead of the working text
     def test_bot_maker_shows_a_summary_and_asks_no_language(self):
-        self.assertNotIn("Show the draft: name and full text", self.bot_maker)
+        # BM-15 overview, not the full working text; BM-07 no language question; BM-16 name; BM-17 working
+        # text language; BM-18 [Create] [Change]; BM-14 WHAT / WHERE
+        self.assertNotRegex(self.bot_maker, r"(?i)show (the )?(draft|full|working) text")
         self.assertNotRegex(self.bot_maker.lower(), r"which language|what language")
-        self.assertIn("a bot's language is the user's language", self.bot_maker)
-        for needle in ["short summary in the user's language", "what it does (2–3 points)", "what it never does",
-                       "tools", "[Create] [Change]", "Do not show the working text unless the user asks",
-                       "Write the working text, in the user's language", "WHAT changes / WHERE",
-                       "name (in the user's language"]:
+        self.assertIn("Never ask the user to choose a bot's language: a bot speaks the user's language",
+                      self.bot_maker)
+        for needle in ["brief overview, in the user's language", "its jobs in 2–3 points", "what it refuses to do",
+                       "its tools", "[Create] [Change]", "Keep the working text to yourself until the user asks",
+                       "Compose the working text in the language the user writes in", "WHAT changes / WHERE",
+                       "the bot's name (unless the user picked one, give it in the user's own language)"]:
             self.assertIn(needle, self.bot_maker)
 
     # U15 + U7 built into every new bot
     def test_bot_maker_new_bot_rules(self):
         new_bot = self.bot_maker.split("New bot:", 1)[1].split("Change a bot:", 1)[0]
-        for needle in ["first message says what it does", "ONE ready example", "every choice or yes/no it asks is a form",
-                       "buttons or checkboxes"]:
+        # BM-28 opening message with one example; BM-29 every choice it offers is a form
+        for needle in ["opening message that names the bot's job", "ONE ready example",
+                       "whenever the bot offers a choice or asks yes/no, it uses a form", "buttons or checkboxes"]:
             self.assertIn(needle, new_bot)
 
     # U7: every choice is a form; the tool's name is not invented

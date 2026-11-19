@@ -73,7 +73,7 @@ case "$P" in
   /|*/./*|*/../*|*/.|*/..) echo "STOP: '$P' cannot be the copy folder. Nothing was changed."; exit 1 ;;
 esac
 if [ -L "$P" ] || { [ -e "$P" ] && { [ ! -d "$P" ] || [ ! -f "$P/$M" ]; }; }; then
-  echo "STOP: $P already exists and is not a GrokBotCEO copy. Nothing was changed."; exit 1
+  echo "STOP: $P already exists and is not a BotCEO copy. Nothing was changed."; exit 1
 fi
 if [ ! -f "$A" ]; then
   echo "STOP: the archive $A is not on this computer. Nothing was changed."; exit 1
@@ -83,7 +83,7 @@ if [ -L "$N" ] || [ -e "$N" ]; then
   if [ ! -L "$N" ] && [ -d "$N" ] && { [ -f "$N/$M" ] || [ -z "$(ls -A "$N")" ]; }; then
     rm -rf "$N"
   else
-    echo "STOP: $N exists and is not a GrokBotCEO copy. Nothing was changed."; exit 1
+    echo "STOP: $N exists and is not a BotCEO copy. Nothing was changed."; exit 1
   fi
 fi
 mkdir -p "$N" || { echo "STOP: cannot create $N. Nothing was changed."; exit 1; }

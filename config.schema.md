@@ -20,7 +20,7 @@ the bots read it from `config.json` when they need it; it is never baked into th
 |---|---|---|---|---|---|
 | `BOT_MAKER_BOT` | Name of your Bot Maker bot (SendToAgent target) | **stage 1** | yes | main-grok, mentor, monitor, reminder, translator | `Bot Maker` |
 | `IMPROVEMENTS_CHANNEL_ID` | ID of the #Improvements channel; written by the installer after it creates the channel | **stage 1 (runtime)** | no (read at run time) | - | `channel-0000-example` |
-| `MENTOR_BOT` | Name of your Mentor bot as shown in the sidebar (may be in your language) | **stage 1** | yes | main-grok, mentor | `Mentor` |
+| `MENTOR_BOT` | Name of your Mentor bot as shown in the sidebar (may be in your language) | **stage 1** | yes | bot-maker, main-grok, mentor | `Mentor` |
 | `MONITOR_BOT` | Name of your Monitor bot as shown in the sidebar (may be in your language) | **stage 1** | yes | main-grok, monitor | `Monitor` |
 | `REMINDER_BOT` | Name of your Reminder bot as shown in the sidebar (may be in your language) | **stage 1** | yes | main-grok, reminder | `Reminder` |
 | `TRANSLATOR_BOT` | Name of your Translator bot as shown in the sidebar (may be in your language) | **stage 1** | yes | main-grok, translator | `Translator` |

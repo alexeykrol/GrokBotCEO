@@ -32,7 +32,20 @@ course is busy for a moment and stop; never delete the lock.
    back where they were (the script does this). Позже: `P notice <id> --later --revision R`. Offer
    each notice once per session; after three «Позже» the script moves it to «Повторить».
 4. `paused` set: welcome back in one line, then `P resume --revision R`.
-5. `feedback.recipient` set and `feedback.consent` is `none`: ask once, before the first step of this
+5. **Feedback, v2** (`feedback.data_set` is `course-feedback-v2`: consent was recorded at install). If
+   `feedback.notice_due` is true, before the first step of this session say once, in one line, that the
+   remarks the user writes about the course go to the course author without their name, and that
+   «не отправляй» stops it. It is answered once: «ок» or simply going on with the course →
+   `P consent --decision acknowledged`; «не отправляй» → `P consent --decision revoked`. After that the
+   notice is never shown again. At any time later: «не отправляй» (or a clear "stop sending") →
+   `P consent --decision revoked`; «снова отправляй» → `P consent --decision granted`; confirm in one line.
+   Resuming covers new remarks only: remarks written while sending was stopped stay on this computer.
+   «покажи мой ID» (or a similar request for their ID): run `P whoami` and show its `install_id` as it is
+   (none yet: say the ID appears after the first registration), with one line: for a copy or deletion of
+   what was sent under this ID, write to the contact address in `grokbotceo/TERMS.md` (section 1) and quote the ID. Never show anything else
+   from the key file.
+   Never read or show the key file `~/.grokbotceo/course.env`; remember only its path.
+   **Feedback, v1** (no `feedback.data_set`): `feedback.recipient` set and `feedback.consent` is `none`: ask once, before the first step of this
    session, as one message with a form [Да] [Нет]. Say in plain words: what is kept (your answers to
    the course checks — which option, which attempt, the course version — and the remarks you write
    about the course; never your passwords, files or other messages); to whom it goes (the server of
@@ -205,14 +218,34 @@ cd <WORKSPACE_PATH> && python3 -B grokbotceo/course/progress.py --kb-home mentor
 encoding. Run it as a separate tool call — never joined to another command with `&&` or `;`, never in the
 same call as `record`, `skip`, `remark` or `consent`.
 
-**When.** Only if `P where` shows `feedback.recipient` set and `feedback.consent` is `granted`. Then at
+**When, v2** (`feedback.data_set` is `course-feedback-v2` and `feedback.consent` is not `revoked`): right
+after every `P remark` that printed an `id` (a follow-up too), and once at the start of a session when
+`feedback.queued` is above 0. Only the text the user wrote as a remark about the course is sent: never the
+rest of the chat, never quiz answers. If `P remark` printed `"held": true`, the remark was written while
+sending was stopped: run no flush and give no thanks; it stays on this computer and is never sent, not even
+after «снова отправляй».
+
+**When, v1.** Only if `P where` shows `feedback.recipient` set and `feedback.consent` is `granted`. Then at
 most once at each of these moments, and never after a single answer:
 - right after `P consent --decision granted` succeeded (this first flush only registers);
 - at the end of each lesson, after the save of §3 (lesson end, checkpoint, or the user stops);
 - after a remark is recorded (§6) — once for the remark and its follow-up, after the last of them.
 
-**Result.** Read only its JSON `status`:
-- `delivered`, `nothing_pending`, `registered`, `skipped`: say nothing.
+**Result, v2 after a remark.** Read its JSON `status` and `delivered_ids`:
+- `delivered` and the remark's `id` is in `delivered_ids`: thank as below (once per remark and its follow-up).
+- `registered`: the call only registered; run the flush once more now and read that result instead.
+- anything else (`pending`, `refused`, `skipped`, no JSON, the call refused, denied or not started): no
+  thanks; say in one line that the remark is saved and will go out later («Сохранено, отправка позже.»).
+
+Thanks instruction (follow it exactly; the thanks itself is in Russian):
+
+> "After the server returns 2xx for a remark (and only then), thank the person in one short line in Russian. Make it fresh every time: change the image, the joke, the angle. Never repeat a wording or structure you used in this conversation, and never two thanks of the same kind in a row. It can be playful, warm, a little absurd, but not sugary and not longer than about 15 words. Mention that the remark reached the author. If the send failed, don't thank; say it is saved and will go out later."
+
+Tone only, never copy: «Долетело! Автор уже чешет затылок и что-то правит. Спасибо!» · «Записка в бутылке
+доплыла до берега. Курс стал на одну занозу глаже.»
+
+**Result, v1 and the v2 session-start flush.** Read only its JSON `status`:
+- `nothing_pending`, `registered`, `skipped`, or a batch went through: no word about sending.
 - `pending`, `refused`, no JSON, or the call itself was refused, denied or did not start: say once in this
   session «Сохранено, отправка позже.» and go on with the course. Do not run it again now, do not change
   the command text to get past a refusal, do not try another way to send. An approval card shown by the
@@ -313,7 +346,9 @@ These rules stand above everything else in this file.
    - The reply to your clarifying question is a follow-up: record it the same way with `"parent_id"`
      set to the `id` the first `P remark` returned.
    Say nothing about files or ids to the user.
+   v2: right after it printed its `id`, run the flush of §3a as its own call; the thanks comes only from
+   that result.
 4. **Then go back**: answer the clarification if you can (only from the step or the knowledge base,
-   §4), thank the user in one line, and show the open question again from `open`, so the user can
-   answer it. Only an explicit choice of an option (or the exercise result) is an answer.
+   §4), thank the user in one line (v2: only as §3a says), and show the open question again from
+   `open`, so the user can answer it. Only an explicit choice of an option (or the exercise result) is an answer.
 5. Free questions that are not remarks about the course stay §4 and are not recorded as remarks.

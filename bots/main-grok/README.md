@@ -16,7 +16,7 @@ this block to the user's own main bot (the default Grok Bot they already have) w
 - In the user's repo: `bots/core/main-grok/previous.md` (the old text), `prompt.md` (the exact text
   the bot runs on), `agent.json`.
 - Whether a bot can `UpdateAgent` itself is not verified. If it fails, the installer says so in
-  one line and goes on; the user can later ask Bot Maker "add GrokBotCEO to my main bot", which
+  one line and goes on; the user can later ask Bot Maker "add BotCEO to my main bot", which
   runs the same `extend` and applies it after the user's yes.
 
 ## What the block says

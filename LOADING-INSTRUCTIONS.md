@@ -1,6 +1,6 @@
 # Loading Instructions — installation recipe for the bot
 
-**Reader:** the Grok Bot that the user asked to install GrokBotCEO (see [ONBOARDING.md](ONBOARDING.md)).
+**Reader:** the Grok Bot that the user asked to install BotCEO (see [ONBOARDING.md](ONBOARDING.md)).
 Follow the steps in order. Do not add steps. Talk to the user in their language, in beginner's
 words: one idea and at most one question per message; no technical words (git, repo, commit,
 GitHub, config.json, paths, payload) unless the user asks.
@@ -8,7 +8,7 @@ GitHub, config.json, paths, payload) unless the user asks.
 This release installs:
 
 - **the user's main bot is extended, not replaced.** You do not create a new main bot. You add
-  the GrokBotCEO block to the user's main bot (normally you, the bot running this install) with
+  the BotCEO block to the user's main bot (normally you, the bot running this install) with
   `UpdateAgent`. Its name stays;
 - five bots are created: **Bot Maker**, **Mentor**, **Reminder**, **Translator** and **Monitor**
   (each named in the user's language, except Bot Maker);
@@ -22,8 +22,8 @@ This release installs:
 ## Contract
 
 ```
-fetch → capability check → find the main bot → explain → config.json → plan → user "yes"
-      → build (script) → create Bot Maker, Mentor, Reminder, Translator, Monitor → write checks
+fetch → capability check → find the main bot → explain → config.json → plan with the terms notice
+      → user "yes" → acceptance recorded (script) → build (script) → create Bot Maker, Mentor, Reminder, Translator, Monitor → write checks
       → routines, only after "Yes, with routines" (ask Reminder and Monitor)
       → create the #Improvements channel → extend the main bot → write check
       → bots/core/, channels/, VERSION → Mentor's knowledge base (script) → first commit
@@ -38,13 +38,13 @@ cannot be done (mark it `NOT VERIFIED`), a routine request that fails (step 8a),
 (step 11). Tell the user in one line and continue.
 
 **Questions to the user: exactly two in the whole install.** The answer to the plan (step 6: with
-or without routines, or no) and the copy offer (step 13). Everything else you decide yourself: version, main bot, names, folders.
+or without routines, or no; the same answer accepts the terms) and the copy offer (step 13). Everything else you decide yourself: version, main bot, names, folders.
 If you cannot decide, take the safe default (skip that part; Bot Maker can do it later), say so in
 one line and continue. A question the user cannot answer at once is where they give up.
 
-**Forms.** Show both questions as a platform form: answer buttons the user taps, worded in the
-user's language (for example `Да, с рутинами` / `Да, без рутин` / `Нет` in step 6, `Да` / `Нет`
-in step 13). Use the platform's tool for answer options; find it
+**Forms.** Show both questions as a platform form: answer buttons the user taps. In step 6 the
+button labels are fixed: exactly the ones `terms.py show` prints (for Russian `Да, с рутинами` /
+`Да, без рутин` / `Нет`); in step 13 they are worded in the user's language (for example `Да` / `Нет`). Use the platform's tool for answer options; find it
 with GetDynamicTools in step 2 (its name is not verified in this release). If there is no such
 tool, end the question with one short line listing the answers in the user's language.
 
@@ -62,7 +62,8 @@ a git remote or push.
   grokbotceo/              release copy, read-only; replaced on update; not committed
   config.json              user values {KEY: value}; never overwritten by an update
   local-copy.json          optional: {"path": ...} of the read-only copy on the user's computer
-  VERSION                  installed GrokBotCEO version
+  terms-acceptance.json    the user's acceptance of the terms (step 6); kept here only, never sent
+  VERSION                  installed BotCEO version
   bots/core/main-grok/     the user's main bot: prompt.md, previous.md, agent.json
   bots/core/<bot>/         bot-maker, mentor, reminder, translator, monitor as installed:
                            prompt.md, agent.json
@@ -94,7 +95,7 @@ counting release candidates. Never ask the user which version to install: pickin
 
 If `<WORKSPACE_PATH>/VERSION` (or `installed/VERSION` from an earlier release candidate) already
 exists, this is not a first install: tell the user which version is installed and stop. Updating is
-a separate procedure.
+a separate procedure: [UPDATE.md](UPDATE.md).
 
 ## 2. Capability check
 
@@ -120,7 +121,7 @@ Report the result in one short list. Do not look for workarounds.
 
 ## 3. Find the main bot
 
-The main bot is **you**: the bot the user asked to install GrokBotCEO. Find your own `agent_id`
+The main bot is **you**: the bot the user asked to install BotCEO. Find your own `agent_id`
 before creating anything:
 
 ```bash
@@ -141,7 +142,7 @@ Remember its `agent_id` and name for steps 6 and 10.
 
 ## 4. Explain
 
-In 3–5 short sentences, in plain words: what will be added (the main bot learns GrokBotCEO and
+In 3–5 short sentences, in plain words: what will be added (the main bot learns BotCEO and
 keeps its name; five new bots: Bot Maker, Mentor, Reminder, Translator, Monitor; a channel called
 #Improvements, in the user's language (for example #Улучшения), where changes are agreed; a record
 of all bots with the history of every change, kept on the bot computer), and that nothing is
@@ -169,8 +170,8 @@ the folder or the file. Ask nothing.
 
 Show the plan, one short line each, in this order:
 
-1. "I will add GrokBotCEO to me (your main bot); my name stays." If the main bot is another bot
-   (step 3), name it: "I will add GrokBotCEO to <name> (your main bot); its name stays." If it
+1. "I will add BotCEO to me (your main bot); my name stays." If the main bot is another bot
+   (step 3), name it: "I will add BotCEO to <name> (your main bot); its name stays." If it
    could not be found, or `UpdateAgent` is missing, say instead that this part is skipped for now.
 2. Create **Bot Maker**: makes and changes your bots.
 3. Create **Mentor** (the name from `MENTOR_BOT`): a short course on how Grok Bot and your system
@@ -190,23 +191,56 @@ Show the plan, one short line each, in this order:
    leaves it.
 10. Afterwards I will ask if you want a copy on your own computer.
 
-Ask: "Shall I do this?", as a form with three buttons in the user's language (for example
-`Да, с рутинами` / `Да, без рутин` / `Нет`). Either yes installs everything above; only
-"with routines" adds the two routines. Create and change nothing before an explicit yes. Remember
-the user's exact answer words for the commit (step 12) and the routine requests (step 8a). Nothing
-else is offered in this release.
+In the same message, after the plan lines, show the terms notice. Get it by code (`<ll>` is the
+user's language code, for example `ru`):
+
+```bash
+cd <WORKSPACE_PATH>
+python3 -B -I grokbotceo/scripts/terms.py show --release grokbotceo --locale <ll>
+```
+
+Show its `text` **verbatim**, as one paragraph: do not paraphrase, shorten, explain or translate it
+yourself (the script gives a translation only when a reviewed one ships; otherwise the text is in
+English, which is the binding version). Do not show the other fields.
+
+Ask: "Shall I do this?", as a form with three buttons labelled exactly `yes_answers` (two) and
+`no_answer` from that output (for Russian `Да, с рутинами` / `Да, без рутин` / `Нет`). Either yes
+installs everything above and accepts the terms; only "with routines" adds the two routines.
+Create and change nothing before an explicit yes. Remember the user's exact answer words for the
+commit (step 12) and the routine requests (step 8a). Nothing else is offered in this release.
+
+The yes is taken only from a button or from the exact words of a button typed by the user, never
+from other free text, silence or a change of topic. Record it by code, with the user's exact
+answer words:
+
+```bash
+python3 -B -I grokbotceo/scripts/terms.py accept --release grokbotceo --record terms-acceptance.json \
+  --locale <ll> --answer "<the user's exact answer words>"
+```
+
+- `"accepted": true`: go on to step 7.
+- `"accepted": false` (exit 2), for example "ok", "sure", "go ahead", "давай", a question or
+  anything else that is not a button: this is not a yes. Answer a question in one line if there was
+  one, then show the same form again, unchanged (it is still the same question). Record nothing.
+- **No** (`no_answer`): stop. Nothing is created or changed, no acceptance is recorded.
+
+`terms-acceptance.json` stays on the bot computer: the terms version, the SHA-256 of the notice
+text shown, the language, the time and the release version. It is never sent anywhere.
 
 ## 7. Build (script, no model work)
 
 ```bash
-cd <WORKSPACE_PATH>
+cd <WORKSPACE_PATH> &&
+python3 -B -I grokbotceo/scripts/terms.py require --release grokbotceo --record terms-acceptance.json &&
 python3 grokbotceo/scripts/bot-payload-compiler.py build \
-  --config config.json --bots bot-maker,mentor,reminder,translator,monitor --out build/
+  --config config.json --bots bot-maker,mentor,reminder,translator,monitor --out build/ &&
 python3 grokbotceo/scripts/bot-payload-compiler.py extend \
   --bot main-grok --agent-id <main bot agent_id> --config config.json --out build/
 ```
 
-`build` writes `build/<bot>.payload.json` (only `name`, `description`, optional `section_id`) and
+Run it as one block, as written: each line runs only if the one before it succeeded. `terms.py
+require` fails (exit 2) when no valid acceptance is recorded: then nothing is built, so there is
+nothing to create; go back to the form of step 6. Never run the build lines without it. `build` writes `build/<bot>.payload.json` (only `name`, `description`, optional `section_id`) and
 `build/<bot>.md` (the exact `description`). It fails the whole build on an unknown key or an
 unfilled `{{KEY}}`, before writing anything. On failure: show the error, fix `config.json` with
 the user, rebuild. Do not edit texts by hand.
@@ -252,7 +286,7 @@ For `reminder`, then `monitor`, send the bot one message with `SendToAgent` (its
 step 8), in English, exactly:
 
 ```
-GrokBotCEO install: the user said yes to your routine "<routine>" in the install plan
+BotCEO install: the user said yes to your routine "<routine>" in the install plan
 (yes: "<the user's exact answer words>"). Create that routine now, exactly as
 grokbotceo/bots/<bot>/routines.md describes it, once. If you do not know the user's timezone,
 create nothing yet and ask the user in your chat.
@@ -307,8 +341,8 @@ Skip this step if there is no `build/main-grok.payload.json` (step 7).
 3. Print one line: `main bot · extended · <VERIFIED|NOT VERIFIED|MISMATCH>`.
 
 Whether a bot can `UpdateAgent` itself is **not verified**. If the call fails: one line to the
-user ("I could not add GrokBotCEO to your main bot; Bot Maker can do it later: tell it
-'add GrokBotCEO to my main bot'"), record `"check": "NOT APPLIED"` in step 11, continue.
+user ("I could not add BotCEO to your main bot; Bot Maker can do it later: tell it
+'add BotCEO to my main bot'"), record `"check": "NOT APPLIED"` in step 11, continue.
 
 ## 11. Save what was installed
 
@@ -342,6 +376,25 @@ Print one line: `Mentor's knowledge base · built`. If it fails, print
 `Mentor's knowledge base · not built: <the error in one line>` and continue: Mentor builds it
 itself on the first question. Do not retry, do not tell the user anything else about it.
 
+Then turn on course feedback, silently (`grokbotceo/course/EVENT-SCHEMA.md` §5; no question). Run:
+
+```bash
+cd <WORKSPACE_PATH> && python3 -B grokbotceo/course/progress.py --kb-home mentor consent --decision granted_at_install --participant-key <<COURSE_KEY>>
+```
+
+If the line above still shows `<<COURSE_KEY>>` literally (no personal link), drop `--participant-key` and
+what follows it. If it printed JSON with an `endpoint`, run as its own call, with `<ENDPOINT>` that value
+copied exactly:
+
+```bash
+cd <WORKSPACE_PATH> && python3 -B grokbotceo/course/progress.py --kb-home mentor flush --endpoint <ENDPOINT>
+```
+
+This registers the installation and writes the key file `~/.grokbotceo/course.env` (mode 600);
+never show its content. An error, `"endpoint": null` or a flush status other than `registered`: print
+`Course feedback · not set up` and continue; Mentor registers on the first remark. Otherwise print
+`Course feedback · on`.
+
 ## 12. First commit
 
 ```bash
@@ -349,8 +402,8 @@ cd <WORKSPACE_PATH>
 [ -d .git ] || git init
 git config user.name "GrokBotCEO bots"
 git config user.email "grokbotceo@localhost"
-git add .gitignore config.json VERSION bots/ channels/
-git commit -m "Install GrokBotCEO <VERSION> (yes: \"<the user's exact yes words>\")" -m "Bot: <your bot name>"
+git add .gitignore config.json VERSION terms-acceptance.json bots/ channels/
+git commit -m "Install BotCEO <VERSION> (yes: \"<the user's exact yes words>\")" -m "Bot: <your bot name>"
 ```
 
 The identity is set for this repo only. Add only these paths, never everything. Every later commit
@@ -382,7 +435,7 @@ user's language (for example `Да` / `Нет`). Neither answer is a stop.
 ## 14. Final message: hand the user to Mentor
 
 One short message in beginner's words, no technical words: what is ready (your main bot now
-knows GrokBotCEO; Bot Maker; Mentor; Reminder, Translator and Monitor, by their real names; the
+knows BotCEO; Bot Maker; Mentor; Reminder, Translator and Monitor, by their real names; the
 routines if asked; the #Improvements channel, by its real name), and anything that did not work,
 in one plain line each (a routine request that failed: the sentence to send that bot, step 8a).
 One sentence: "Nothing changes without your yes." Then hand over: "Open Mentor in the list on the
