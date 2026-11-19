@@ -4,16 +4,23 @@ Tests for course feedback contract v2 (course/EVENT-SCHEMA.md §5; design docs/d
 consent recorded at install, the course-start notice answered once, stop / resume, remarks only on the wire,
 flush right after a remark with the delivered ids, the local queue (events.jsonl + outbox-state.json) resent on
 the next flush, registration at install into the key file (mode 600, path from GROKBOT_COURSE_ENV), the token
-never printed; plus static guards on MENTOR-RUNTIME (thanks instruction, U20 wording).
+never printed; the update path (UPDATE.md step 11: gate, consent at update, never over an earlier decision);
+plus static guards on MENTOR-RUNTIME (thanks instruction, U20 wording).
 
 Reuses the harness of test-r030.py (local http.server stub on 127.0.0.1, temp folders only). Stdlib only.
 """
+import contextlib
 import importlib.util
+import io
 import json
+import os
+import re
+import shutil
 import stat
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.dont_write_bytecode = True          # loading test-r030.py must not leave a .pyc in the release tree
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -30,6 +37,7 @@ def _load(name, path):
 
 
 R = _load("r030_harness_for_v2", SCRIPT_DIR / "test-r030.py")
+UP = _load("update_plan_for_v2", SCRIPT_DIR / "update-plan.py")
 PG = R.PG
 PKEY = "pk_" + "A1b2C3d4" * 3
 THANKS = ('"After the server returns 2xx for a remark (and only then), thank the person in one short line in '
@@ -279,6 +287,106 @@ class TestSending(V2):
                     if name in ("_post", "Popen", "urlopen", "create_connection"):
                         callers.setdefault(name, set()).add(fn.name)
         self.assertEqual(callers, {"_post": {"cmd_flush"}, "Popen": {"_post"}})
+
+
+class TestUpdatePath(V2):
+    """UPDATE.md step 11: an update to a release whose accepted terms notice says remarks are sent turns course
+    feedback on as the install does (gate `update-plan.py feedback`, then consent granted_at_install and one
+    flush), and never over a decision the user already made."""
+
+    def setUp(self):
+        super().setUp()
+        self.ws = self.dir                                  # self.home is <ws>/mentor, as --kb-home mentor
+        self.live = self.ws / "grokbotceo"
+        (self.live / "scripts").mkdir(parents=True)
+        (self.live / "course").mkdir()
+        shutil.copy2(SCRIPT_DIR / "terms.py", self.live / "scripts" / "terms.py")
+        for name in ("TERMS.md", "TERMS-NOTICE.md", "TERMS-NOTICE.ru.md", "VERSION"):
+            shutil.copy2(RELEASE_DIR / name, self.live / name)
+        version = (RELEASE_DIR / "VERSION").read_text(encoding="utf-8").strip()
+        (self.ws / "VERSION").write_text(version + "\n", encoding="utf-8")
+        self.serve()                                        # the endpoint: GROKBOT_FEEDBACK_URL (stub)
+
+    def accept_terms(self):
+        terms = _load("terms_for_update_path", self.live / "scripts" / "terms.py")
+        terms.accept(self.live, self.ws / "terms-acceptance.json", "Yes", locale="en", mode="update")
+
+    def gate(self):
+        out = io.StringIO()
+        with mock.patch.dict(os.environ, self.env, clear=True), contextlib.redirect_stdout(out):
+            code = UP.main(["feedback", "--workspace", str(self.ws)])
+        self.assertEqual(code, 0)
+        return json.loads(out.getvalue())
+
+    def update_step(self):
+        """The step as UPDATE.md writes it: gate; consent without a participant key; flush only if written."""
+        g = self.gate()
+        if not g["run"]:
+            return g, None, None
+        c = self.ok("consent", "--decision", "granted_at_install")
+        r = self.ok("flush", "--endpoint", c["endpoint"]) if c.get("written") and c.get("endpoint") else None
+        return g, c, r
+
+    def test_notice_version_of_this_release_says_remarks(self):
+        terms = _load("terms_for_notice_version", SCRIPT_DIR / "terms.py")
+        self.assertGreaterEqual(int(terms.notice(RELEASE_DIR)["notice_version"]), UP.FEEDBACK_NOTICE_MIN)
+
+    def test_update_from_install_without_consent_turns_feedback_on(self):
+        self.accept_terms()
+        g, c, r = self.update_step()
+        self.assertEqual(g["run"], True)
+        self.assertEqual((c["decision"], c["data_set"], c["written"], c["notice_due"]),
+                         ("granted_at_install", "course-feedback-v2", True, True))
+        self.assertNotIn("key_file", c)                     # no participant key on an update
+        self.assertEqual((r["status"], r["key_file"]), ("registered", "written"))
+        self.assertEqual(set(self.key()), {"GROKBOT_INSTALL_ID", "GROKBOT_SEND_TOKEN"})
+        self.assertEqual(self.gate(), {"run": False, "reason": "consent_recorded"})   # a rerun does nothing
+
+    def test_earlier_stop_is_never_overridden(self):
+        self.install()
+        self.ok("consent", "--decision", "revoked")
+        self.accept_terms()
+        self.assertEqual(self.gate(), {"run": False, "reason": "consent_recorded"})
+        again = self.ok("consent", "--decision", "granted_at_install")       # progress.py refuses as well
+        self.assertEqual((again["written"], again["decision"]), (False, "revoked"))
+
+    def test_earlier_v1_decision_is_never_overridden(self):
+        self.ok("consent", "--decision", "revoked")          # a v1 decision, no v2 line
+        self.accept_terms()
+        self.assertEqual(self.gate(), {"run": False, "reason": "earlier_decision"})
+        again = self.ok("consent", "--decision", "granted_at_install")
+        self.assertEqual((again["written"], again["decision"], again["data_set"]),
+                         (False, "revoked", "course-feedback-v1"))
+        self.assertEqual(self.stub.requests, [])
+
+    def test_no_acceptance_no_feedback(self):
+        self.assertEqual(self.gate(), {"run": False, "reason": "terms_not_accepted"})
+        (self.ws / "terms-acceptance.json").write_text("{}", encoding="utf-8")
+        self.assertEqual(self.gate(), {"run": False, "reason": "terms_not_accepted"})
+
+    def test_notice_without_remarks_no_feedback(self):
+        n = self.live / "TERMS-NOTICE.md"
+        n.write_text(re.sub(r"Notice version: \d+", "Notice version: 1", n.read_text(encoding="utf-8"), count=1),
+                     encoding="utf-8")
+        self.accept_terms()
+        self.assertEqual(self.gate(), {"run": False, "reason": "notice_without_remarks"})
+
+    def test_no_endpoint_no_feedback(self):
+        self.accept_terms()
+        self.env.pop("GROKBOT_FEEDBACK_URL")
+        self.assertEqual(self.gate(), {"run": False, "reason": "no_endpoint"})
+        (self.live / "course" / "feedback.json").write_text('{"endpoint": "https://x.example"}', encoding="utf-8")
+        self.assertEqual(self.gate()["run"], True)
+
+    def test_partial_update_no_feedback(self):
+        self.accept_terms()
+        (self.ws / "update-state.json").write_text(json.dumps({"bots": {"mentor": {"outcome": "failed"}}}),
+                                                   encoding="utf-8")
+        self.assertEqual(self.gate(), {"run": False, "reason": "update_not_complete"})
+        (self.ws / "update-state.json").unlink()
+        (self.ws / "VERSION").write_text("0.2.0\n", encoding="utf-8")
+        self.assertEqual(self.gate(), {"run": False, "reason": "update_not_complete"})
+        self.assertFalse((self.home / "consent.jsonl").exists())
 
 
 class TestRuntimeAndInvariants(unittest.TestCase):

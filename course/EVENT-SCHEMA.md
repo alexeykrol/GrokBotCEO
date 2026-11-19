@@ -184,7 +184,7 @@ the chat, never quiz answers.
 
 | decision | written by | rule |
 |---|---|---|
-| `granted_at_install` | the install, `consent --decision granted_at_install [--participant-key K]` | only when the recipient has no consent line yet (a re-install or update never overrides a decision) |
+| `granted_at_install` | the install, `consent --decision granted_at_install [--participant-key K]`; also an update that installs a release whose accepted terms notice says remarks are sent (UPDATE.md step 11, no key) | only when the recipient has no consent line yet (a re-install or update never overrides a decision) |
 | `acknowledged` | Mentor, the course-start notice answered («ок» or going on) | once; never after `revoked` (it does not resume sending) |
 | `revoked` | «не отправляй» | stops sending at once |
 | `granted` | «снова отправляй» | resumes |
@@ -205,7 +205,8 @@ registration found only in `identity.json` is copied there once. A key file that
 **Registration at install.** The install runs `consent --decision granted_at_install`, then one
 `flush --endpoint <configured endpoint>`: with no credentials this flush is the registration (`registered`,
 `key_file`), so the first remark is not spent registering. If it failed, the first remark's flush registers
-and the remark goes with the next flush.
+and the remark goes with the next flush. An update to such a release from an install with no consent line
+does the same, gated by `update-plan.py feedback` (UPDATE.md step 11).
 
 **Flush after each remark.** Mentor runs the flush right after every `remark` (and once at session start when
 `queued` > 0). Envelope `{"install_id", "events", "contract": "course-feedback-v2"}`. The v2 flush summary adds

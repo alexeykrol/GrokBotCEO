@@ -1000,6 +1000,46 @@ class TestReleaseTexts(unittest.TestCase):
         self.assertFalse(update_plan.STATE_FILE.startswith("build"))
         self.assertFalse(update_plan.OLD_TREE.startswith("build"))
 
+    def test_course_feedback_step(self):
+        """0.3.1: an update turns course feedback on as install step 11 does, only after a complete update,
+        only through the gate (accepted remarks notice, no decision yet, endpoint), never with a key."""
+        text = (RELEASE_DIR / "UPDATE.md").read_text(encoding="utf-8")
+        step11 = text[text.index("## 11."):text.index("## 12.")]
+        consent = "progress.py --kb-home mentor consent --decision granted_at_install"
+        flush = "progress.py --kb-home mentor flush --endpoint <ENDPOINT>"
+        for needle in ("U feedback", consent, flush, "Only if `complete` is true", "`run: true`",
+                       "`run: false`: do nothing", "notice version 2 or later", "no consent line at all",
+                       "«не отправляй»", '`"written": true`', "Course feedback · on",
+                       "Course feedback · not set up", "Do not retry"):
+            self.assertIn(needle, step11, needle)
+        # order: finish, then the gate, then consent, then the flush
+        self.assertLess(step11.index("U finish"), step11.index("U feedback"))
+        self.assertLess(step11.index("U feedback"), step11.index(consent))
+        self.assertLess(step11.index(consent), step11.index(flush))
+        # the acceptance of the notice is recorded before (step 7) and required by the swap (step 8)
+        self.assertLess(text.index("terms.py accept"), text.index("U feedback"))
+        self.assertLess(text.index("terms.py require"), text.index("U feedback"))
+        consent_line = next(l for l in step11.splitlines() if consent in l)
+        self.assertNotIn("--participant-key", consent_line)
+        self.assertNotIn("<<COURSE_KEY>>", text)
+        self.assertEqual(text.count("--decision granted_at_install"), 1)
+        self.assertIn("course feedback", text[text.index("## Contract"):text.index("**Stop only at:**")])
+        # the gate's notice threshold is the first notice that says remarks are sent
+        self.assertEqual(update_plan.FEEDBACK_NOTICE_MIN, 2)
+        self.assertIn("feedback", update_plan.COMMANDS)
+
+    def test_feedback_gate_reads_only(self):
+        """`U feedback` writes nothing; with no terms record it is a no."""
+        with tempfile.TemporaryDirectory() as d:
+            ws = Path(d)
+            copy_release(ws / "grokbotceo")
+            (ws / "VERSION").write_text((RELEASE_DIR / "VERSION").read_text())
+            before = tree(ws)
+            r = run("feedback", "--workspace", ws)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(json.loads(r.stdout), {"run": False, "reason": "terms_not_accepted"})
+            self.assertEqual(tree(ws), before)
+
     def test_routes_to_update(self):
         bm = (RELEASE_DIR / "bots" / "bot-maker" / "prompt.md").read_text(encoding="utf-8")
         self.assertIn("UPDATE.md", bm)

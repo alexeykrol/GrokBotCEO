@@ -17,6 +17,8 @@ An update:
   changed, or one whose installed copy is missing, is updated only if the user ticks it;
 - offers the core bots that are new in the release, or were never created;
 - carries the user's course progress over and rebuilds Mentor's knowledge base;
+- after a complete update whose terms notice (accepted by the user) says course remarks are sent,
+  turns course feedback on as a fresh install does — never over a decision the user already made;
 - if a bot could not be updated, ends as **partial**: the version number is not moved, and the next
   "update BotCEO" finishes only what is left (step 2 `resume`);
 - never touches: values the user set in `config.json`, `bots/my/`, `bots/marketplace/`, any bot
@@ -32,7 +34,8 @@ version check → fetch the target into staging, check the commit → config key
       → per approved bot: recheck (script) → UpdateAgent / CreateAgent → write check → record
       → routines, only if ticked (as install step 8a)
       → course progress migrated → Mentor's knowledge base → finish: VERSION only if every
-        approved bot is done (else partial) → commit → local copy refreshed → final message
+        approved bot is done (else partial) → commit → course feedback (only after a complete
+        update with the remarks notice accepted; gate by script) → local copy refreshed → final message
 ```
 
 **Stop only at:** not installed, already current or newer (steps 1–2), fetch or commit check failed
@@ -40,7 +43,8 @@ version check → fetch the target into staging, check the commit → config key
 (step 8), no recorded acceptance of changed terms (step 8). Every stop before step 8 leaves everything as it was: nothing is changed before the
 swap. These are **not** stops: one bot's UpdateAgent or CreateAgent error, a bot changed after the
 plan, a write check that is not `VERIFIED` (step 9: that bot is left unfinished), a failed routine
-request, a failed course migration or knowledge-base build (step 10). Tell the user in one line and
+request, a failed course migration or knowledge-base build (step 10), course feedback not set up
+(step 11). Tell the user in one line and
 continue. An unfinished bot makes the update **partial** (step 11): the next update run finishes it.
 
 **Questions to the user: one in the whole update** — the plan (step 7). The only other possible
@@ -383,7 +387,7 @@ python3 -B grokbotceo/course/kb-box/build_kb.py --kb-home mentor
 `Mentor's knowledge base · built`, or `· not built: <error>` and continue (Mentor builds it itself
 on the first question). Do not retry.
 
-## 11. VERSION and commit
+## 11. VERSION, commit and course feedback
 
 ```bash
 cd <WORKSPACE_PATH>
@@ -414,6 +418,37 @@ git commit -m "<Update | Partial update> BotCEO <installed> -> <target> (yes: \"
 `Partial update` when `complete` is false. Only the paths from `git_add`, plus
 `terms-acceptance.json` (the local record of the terms the user accepted; it is never sent); never everything, never
 `bots/my/` or `bots/marketplace/`. If `complete` is true: `rm -rf build/update`.
+
+**Course feedback** (`grokbotceo/course/EVENT-SCHEMA.md` §5; as install step 11; silent, no question).
+Only if `complete` is true. First the gate, by code:
+
+```bash
+cd <WORKSPACE_PATH> && U feedback
+```
+
+It prints `run` and `reason`. `run` is true only when the user has accepted the terms notice that says
+course remarks are sent (notice version 2 or later, shown in step 7 or accepted before), the install
+has no course-feedback decision yet (no consent line at all, so a «не отправляй» said earlier stays as
+it is), and an endpoint is configured. `run: false`: do nothing here and print nothing — whatever the
+reason. `run: true`: run
+
+```bash
+cd <WORKSPACE_PATH> && python3 -B grokbotceo/course/progress.py --kb-home mentor consent --decision granted_at_install
+```
+
+(an update has no personal link, so never `--participant-key`). It never writes over an earlier
+decision (`"written": false`). If it printed JSON with `"written": true` and an `endpoint`, run as its
+own call, with `<ENDPOINT>` that value copied exactly:
+
+```bash
+cd <WORKSPACE_PATH> && python3 -B grokbotceo/course/progress.py --kb-home mentor flush --endpoint <ENDPOINT>
+```
+
+This registers the installation and writes the key file `~/.grokbotceo/course.env` (mode 600);
+never show its content. An error, `"written": false`, `"endpoint": null` or a flush status other than
+`registered`: print `Course feedback · not set up` and continue; Mentor registers on the first
+remark. Otherwise print `Course feedback · on`. Do not retry. The consent and key files are not
+committed. Mentor tells the user about remarks again when the course starts (`notice_due`).
 
 ## 12. Refresh the copy on the user's computer
 

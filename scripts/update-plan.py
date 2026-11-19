@@ -43,6 +43,13 @@ Commands (every path is relative to --workspace unless absolute; default workspa
                                     deleted, complete true. Otherwise VERSION is NOT written, the state is
                                     partial, the old tree kept; complete false. Both: .gitignore lines,
                                     bots/my and bots/marketplace kept; prints the paths to `git add`
+  feedback                          after a complete update: may the update turn on course feedback
+                                    (UPDATE.md step 11, as install step 11)? Prints {run, reason}; run true
+                                    only when the update is complete, terms-acceptance.json is a valid
+                                    acceptance of grokbotceo/'s terms with notice version >= 2 (the notice
+                                    that says remarks are sent), an endpoint is configured, and
+                                    mentor/consent.jsonl holds no consent line at all (no v2 line, and no
+                                    earlier decision either: an update never overrides one). Reads only.
 
 Every command first recovers an interrupted swap: grokbotceo/ missing and grokbotceo.old/ present ->
 grokbotceo.old/ is renamed back; and an interrupted finish: `finish` writes its intent ("finalizing")
@@ -990,10 +997,85 @@ def cmd_finish(args) -> Dict[str, Any]:
     return out
 
 
+# ---------------------------------------------------------------- feedback
+
+FEEDBACK_NOTICE_MIN = 2                  # the first terms notice that says course remarks are sent
+FEEDBACK_DATA_SET_V2 = "course-feedback-v2"
+CONSENT_FILE = "mentor/consent.jsonl"    # progress.py --kb-home mentor
+
+
+def load_terms(release: Path):
+    script = release / "scripts" / "terms.py"
+    if not script.is_file():
+        raise UpdateError(f"{script} is missing")
+    spec = importlib.util.spec_from_file_location("release_terms", script)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def configured_endpoint(release: Path) -> Optional[str]:
+    """As progress.py endpoint_of: env GROKBOT_FEEDBACK_URL, else "endpoint" in course/feedback.json.
+    Only presence is checked here; progress.py validates the URL itself."""
+    url = os.environ.get("GROKBOT_FEEDBACK_URL")
+    if not url:
+        cfg = read_json(release / "course" / "feedback.json")
+        url = cfg.get("endpoint") if isinstance(cfg, dict) else None
+    return url.strip() if isinstance(url, str) and url.strip() else None
+
+
+def consent_lines(ws: Path) -> List[Dict[str, Any]]:
+    text = read_text(ws / CONSENT_FILE)
+    out: List[Dict[str, Any]] = []
+    for line in (text or "").splitlines():
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(rec, dict) and rec.get("decision"):
+            out.append(rec)
+    return out
+
+
+def cmd_feedback(args) -> Dict[str, Any]:
+    """Read-only gate for the update's "turn on course feedback" step. The decision itself stays with
+    progress.py (`consent --decision granted_at_install` never writes over an earlier decision); this gate
+    only says whether to run it at all."""
+    ws = args.workspace
+    live = ws / LIVE_TREE
+
+    def no(reason: str) -> Dict[str, Any]:
+        return {"run": False, "reason": reason}
+
+    version = read_text(live / "VERSION")
+    if version is None or version.strip() != (installed_version(ws) or "") or open_update(load_state(ws)):
+        return no("update_not_complete")
+    try:
+        terms = load_terms(live)
+        if terms.validate(live, ws / TERMS_RECORD):
+            return no("terms_not_accepted")
+        rec = read_json(ws / TERMS_RECORD)
+        notice_version = int(str(rec.get("notice_version")))
+    except Exception:  # any failure of the terms check is a no (fail closed)
+        return no("terms_not_accepted")
+    if notice_version < FEEDBACK_NOTICE_MIN:
+        return no("notice_without_remarks")
+    if configured_endpoint(live) is None:
+        return no("no_endpoint")
+    lines = consent_lines(ws)
+    if any((r.get("scope") or {}).get("data_set") == FEEDBACK_DATA_SET_V2
+           for r in lines if isinstance(r.get("scope"), dict)):
+        return no("consent_recorded")
+    if lines:
+        return no("earlier_decision")
+    return {"run": True, "reason": "accepted_notice_v%d" % notice_version}
+
+
 # ---------------------------------------------------------------- CLI
 
 COMMANDS = {"version": cmd_version, "config": cmd_config, "plan": cmd_plan, "approve": cmd_approve,
-            "recheck": cmd_recheck, "swap": cmd_swap, "record": cmd_record, "finish": cmd_finish}
+            "recheck": cmd_recheck, "swap": cmd_swap, "record": cmd_record, "finish": cmd_finish,
+            "feedback": cmd_feedback}
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -1734,7 +1734,8 @@ def consent_info(store, host):
 
 def cmd_consent(args, course, store):
     """The learner's sending decision, one appended line. v1: granted | revoked. v2 (EVENT-SCHEMA §5):
-    granted_at_install (written by the install, once: never over an earlier decision), acknowledged (the
+    granted_at_install (written by the install, or by an update whose accepted terms notice
+    says remarks are sent; once: never over an earlier decision), acknowledged (the
     course-start notice answered; never re-grants after a stop), and the stop / resume words as revoked /
     granted, which keep the data set already in force (none yet -> v1, as before)."""
     host = (args.recipient or "").strip().lower()
