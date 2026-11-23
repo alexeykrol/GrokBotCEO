@@ -1,11 +1,25 @@
 # BotCEO Terms of Use
 
-Version 2 · Effective date: 19 November 2026 · Published at https://github.com/alexeykrol/GrokBotCEO (file `TERMS.md`)
+Version 3 · Effective date: 23 November 2026 · Published at https://github.com/alexeykrol/GrokBotCEO (file `TERMS.md`)
 
 These terms cover BotCEO: the bots, the operating system for your bots, the course teacher, plugins
 and scripts that you install into your own AI workspace, and the courses that come with them or are
 delivered to them (together, the "Products"). Our website and what is sold there have their own terms;
 these terms do not cover them.
+
+> **Plain summary** (the terms below are what counts)
+>
+> - BotCEO is in a **closed test**. It is experimental, and the open part is free.
+> - **Use it at your own risk.** It may break, change, lose your settings or data, or stop at any
+>   time. Keep copies of anything you care about.
+> - **We promise nothing about how it works**: no warranty, no uptime, no support duty, no fixed
+>   features. What we do promise about your personal information is in the
+>   [Privacy Policy](PRIVACY.md), and those promises stand.
+> - **Your bots act under your account.** You decide what they may do, and you are responsible for
+>   what they send and do. If someone makes a claim over that, it is on you, not us.
+> - You may build on the open part if you show the credit "Based on BotCEO by Alexey Krol". The
+>   course materials are for you and the people who work for you.
+> - You must be 18 or older.
 
 ## 1. Who we are
 
@@ -28,7 +42,30 @@ before 0.3.0, and any other material in an earlier release that the latest
 `LICENSE-MAP.md` does not list, are not licensed by us. Bot Maker is licensed starting with release
 0.3.0, which contains an independently written version.
 
-## 3. Two parts, two sets of rules
+## 3. Closed test
+
+During the closed test the Products are experimental, unfinished software and course material,
+offered for testing and feedback. They may contain errors, produce wrong or unexpected results,
+behave differently from one release to the next, lose settings or data, or stop working. Features
+and courses may be added, changed or removed, and the closed test may be paused or ended, **at any
+time, for any reason, without notice**.
+
+You use the Products **at your own risk**. Before you rely on them for anything important, keep your
+own copies of your settings, your data and what your bots produce.
+
+There is **no service level, no availability guarantee and no obligation to provide support,
+updates, fixes or answers**. You can write to us (section 19); we may or may not reply.
+
+The open part is published openly. What is closed is taking part in the test: your personal
+invitation link, the participant key it gives you, course delivery and any help we choose to give.
+These are personal; please do not pass them on or sell them. We may withdraw an invitation or a key,
+or end your participation in the closed test, at any time, for any reason. This does not take back
+rights that the BotCEO License already gave you in a copy of the open part you received
+(section 12).
+
+This section does not change what the [Privacy Policy](PRIVACY.md) says about personal information.
+
+## 4. Two parts, two sets of rules
 
 | Part | What it is | Rules |
 |---|---|---|
@@ -41,7 +78,7 @@ before 0.3.0, and any other material in an earlier release that the latest
 If these terms and a license say different things about what you may do with a file, the license for
 that file applies. For everything else, these terms apply.
 
-## 4. The open part — in short
+## 5. The open part — in short
 
 This is a summary; the BotCEO License 1.0 contains the exact rules. It is our own license: it has the
 terms of a well-known permissive license plus one condition of ours, the credit.
@@ -64,7 +101,7 @@ terms of a well-known permissive license plus one condition of ours, the credit.
   the credit is one of your obligations under it. If you do not give the credit, your rights under
   the license end; they are restored if you fix it within 30 days after we tell you.
 
-## 5. Course Materials — in short
+## 6. Course Materials — in short
 
 This is a summary; the Course License contains the exact rules.
 
@@ -73,7 +110,7 @@ This is a summary; the Course License contains the exact rules.
   people outside your company, use them to train AI models, extract delivered content in bulk, or
   share your access.
 
-## 6. Your bots, your content, your responsibility
+## 7. Your bots, your content, your responsibility
 
 Your settings, your data and the content you and your bots create are yours. We do not receive them
 (see the Privacy Policy for the little that we do receive).
@@ -86,7 +123,12 @@ they run on.
 The Products use AI models. AI output can be wrong, incomplete or unsuitable. Check important results
 before you rely on them, and keep a person in control of actions that matter.
 
-## 7. Platforms and other services
+**Indemnity.** As far as the law allows, you are responsible for, and will defend and indemnify us
+against, any claims, losses, damages and costs (including reasonable legal fees) arising from what
+your bots send or do, from content you create or publish with the Products, or from your breach of
+these terms, of a license, or of the terms of a platform or service you use with the Products.
+
+## 8. Platforms and other services
 
 The Products work with platforms run by other companies (for example Grok Bot). You use those
 platforms under your own agreement with them, you pay them any fees they charge, and their terms and
@@ -96,12 +138,12 @@ them. A platform may change or stop working in a way that breaks a Product.
 BotCEO is independent. It is not affiliated with, sponsored by or endorsed by the companies that run
 those platforms.
 
-## 8. Courses
+## 9. Courses
 
 The courses are educational. They are not professional, legal, financial, tax or business advice, and
 we do not promise any particular result. What you do with what you learn is your decision.
 
-## 9. Feedback and contributions
+## 10. Feedback and contributions
 
 If you send us ideas, suggestions or reports about the Products, we may use them to improve the
 Products without any obligation to you. Do not send us anything confidential. The Privacy Policy
@@ -113,15 +155,15 @@ Remarks about a course that you write to the course teacher are sent to us as th
 describes. The installation message tells you this before you confirm, and you can stop the sending
 at any time by telling the course teacher.
 
-Release 0.3.0 sends no telemetry. If a later release sends telemetry, it will do so only under an
+This release sends no telemetry. If a later release sends telemetry, it will do so only under an
 updated Privacy Policy and updated terms.
 
-## 10. Price
+## 11. Price
 
 The open part is free of charge. Some courses are free and some are paid. Paid courses and services
 have their own terms, shown before you pay.
 
-## 11. Versions and changes
+## 12. Versions and changes
 
 These terms and the licenses are delivered with each release. We may change them for later releases;
 the version number and date show which text you have. A new version applies to you when you install or
@@ -131,49 +173,52 @@ received are not taken back, unless you break that license.
 We may change, stop publishing or stop supporting any Product at any time. We do not have to provide
 updates or support.
 
-## 12. Ending
+## 13. Ending
 
 You may stop using the Products at any time. Your rights end if you break these terms or a license;
 the licenses say how they end and how a violation can be fixed. When your rights end, stop using the
-affected Products and delete your copies. Sections 6, 8, 9 and 13–16 continue to apply.
+affected Products and delete your copies. Sections 3, 7, 9, 10 and 14–17 continue to apply.
 
-## 13. No warranty
+## 14. No warranty
 
-**As far as the law allows, the Products are provided "as is" and "as available", without any
+**As far as the law allows, the Products are provided "as is", "as available" and "with all faults", without any
 warranty of any kind, express or implied, including warranties of merchantability, fitness for a
 particular purpose, accuracy and non-infringement. We do not warrant that the Products will work
-without errors or interruptions, or that AI output will be correct.**
+without errors or interruptions, that they will keep your settings or data, or that AI output
+will be correct.**
 
-## 14. Limit of liability
+## 15. Limit of liability
 
 **As far as the law allows, we are not liable for any indirect, incidental, special, consequential or
 punitive damages, or for lost profits, revenue, data or business, arising from the Products or these
 terms, under any legal theory. Our total liability for all claims is limited to the greater of
-US $100 and the amount you paid us for the Product in the 12 months before the claim.**
+US $100 and the amount you paid us for the Product in the 12 months before the claim.** As far as
+the law allows, we are also not liable for lost work, for what your bots sent or did, or for charges
+by platforms and other services.
 
 Nothing in these terms limits liability that cannot be limited by law, or takes away rights that the
 law of your place of residence gives you as a consumer and that cannot be waived.
 
-## 15. Law and courts
+## 16. Law and courts
 
 The laws of the State of California, USA, govern these terms, without regard to its conflict-of-law
 rules. Disputes are heard in the state or federal courts located in Santa Clara County, California,
 unless the law of your place of residence gives you the right to bring a claim elsewhere.
 
-## 16. General
+## 17. General
 
-These terms, the licenses and the documents listed in section 3 are the whole agreement between you
+These terms, the licenses and the documents listed in section 4 are the whole agreement between you
 and us about the Products. If part of these terms cannot be enforced, the rest still applies. If we do
 not enforce a right, we do not give it up. We may transfer our rights under these terms to a company
 that takes over the Products; the terms continue to apply.
 
 You must follow the export-control and sanctions laws that apply to you.
 
-## 17. Language
+## 18. Language
 
 These terms are written in English. Translations are provided for convenience only; the English
 version controls.
 
-## 18. Contact
+## 19. Contact
 
 Alexey Krol · support@alexeykrol.com · postal address: see section 1

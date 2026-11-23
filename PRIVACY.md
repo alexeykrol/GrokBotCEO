@@ -1,10 +1,10 @@
 # BotCEO Privacy Policy
 
-Version A-2.1 · Effective date: 19 November 2026 · Published at https://github.com/alexeykrol/GrokBotCEO (file `PRIVACY.md`)
+Version A-2.2 · Effective date: 23 November 2026 · Published at https://github.com/alexeykrol/GrokBotCEO (file `PRIVACY.md`)
 
-Applies to these versions only: 0.1.0-rc7 and 0.2.0 (published as GrokBotCEO), and 0.3.0 (closed
-test). Each later release is added to this list only by a new
-version of this policy.
+Applies to these versions only: 0.1.0-rc7 and 0.2.0 (published as GrokBotCEO), and the closed-test
+releases 0.3.0 and later 0.3.x, which all handle personal information in the same way. A release
+that handles it differently is covered only by a new version of this policy.
 
 ## 1. Who we are
 
@@ -54,7 +54,7 @@ on that website.
 **Releases before 0.3.0.** The package configures no receiving address and the
 installer adds none, so the course sends us nothing.
 
-**Release 0.3.0 (closed test).** The closed test exists to improve the course,
+**Releases 0.3.x (closed test).** The closed test exists to improve the course,
 so remarks about the course go to its author:
 
 - **What is sent.** Only the text that you write to the course teacher (the Mentor bot) as a remark

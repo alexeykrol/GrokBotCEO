@@ -66,7 +66,7 @@ class TestNotice(Base):
         out = json.loads(r.stdout)
         self.assertEqual(out["text"], body)
         self.assertEqual(out["sha256"], hashlib.sha256(body.encode("utf-8")).hexdigest())
-        self.assertEqual((out["locale"], out["notice_version"], out["terms_version"]), ("en", "2", "2"))
+        self.assertEqual((out["locale"], out["notice_version"], out["terms_version"]), ("en", "3", "3"))
         self.assertEqual(out["yes_answers"], ["Yes, with routines", "Yes, without routines"])
         self.assertEqual(out["no_answer"], "No")
 
@@ -100,7 +100,7 @@ class TestNotice(Base):
         out = terms.notice(self.release, "ru-RU")
         self.assertEqual(out["locale"], "ru")
         self.assertTrue(out["text"].startswith("BotCEO бесплатен."))
-        p.write_text(p.read_text(encoding="utf-8").replace("Notice version: 2", "Notice version: 0"), encoding="utf-8")
+        p.write_text(p.read_text(encoding="utf-8").replace("Notice version: 3", "Notice version: 0"), encoding="utf-8")
         self.assertEqual(terms.notice(self.release, "ru")["locale"], "en", "a stale translation is not shown")
 
     def test_other_language_gets_english_text_and_labels(self):
@@ -150,8 +150,8 @@ class TestAcceptance(Base):
         rec = json.loads(self.record.read_text(encoding="utf-8"))
         self.assertEqual(sorted(rec), sorted(terms.RECORD_FIELDS))
         shown = terms.notice(self.release, "ru")
-        self.assertEqual(rec["terms_version"], "2")
-        self.assertEqual(rec["notice_version"], "2")
+        self.assertEqual(rec["terms_version"], "3")
+        self.assertEqual(rec["notice_version"], "3")
         self.assertEqual(rec["notice_sha256"], shown["sha256"])
         self.assertEqual((rec["locale"], rec["ui_locale"], rec["mode"]), ("en", "ru", "install"))
         self.assertEqual(rec["release_version"], (ROOT_DIR / "VERSION").read_text().strip())
@@ -204,7 +204,7 @@ class TestRequireAndCheck(Base):
     def test_new_terms_version_asks_again(self):
         self.accept()
         p = self.release / "TERMS.md"
-        p.write_text(p.read_text(encoding="utf-8").replace("Version 2 ·", "Version 3 ·", 1), encoding="utf-8")
+        p.write_text(p.read_text(encoding="utf-8").replace("Version 3 ·", "Version 4 ·", 1), encoding="utf-8")
         out = json.loads(run("check", "--release", self.release, "--record", self.record).stdout)
         self.assertTrue(out["show"])
         self.assertIn("terms version changed", out["reason"])
@@ -221,7 +221,7 @@ class TestRequireAndCheck(Base):
                 self.assertEqual(run("require", "--release", self.release, "--record", self.record).returncode, 2)
         self.record.write_text("{", encoding="utf-8")
         self.assertEqual(run("require", "--release", self.release, "--record", self.record).returncode, 2)
-        self.record.write_text(json.dumps({"terms_version": "2"}), encoding="utf-8")
+        self.record.write_text(json.dumps({"terms_version": "3"}), encoding="utf-8")
         self.assertEqual(run("require", "--release", self.release, "--record", self.record).returncode, 2)
 
     def test_rejected_answer_keeps_an_old_record(self):
@@ -344,13 +344,13 @@ class TestDocumentedBlocksStop(unittest.TestCase):
     def test_install_block_refuses_with_invalid_receipt(self):
         block = self.install_fixture()
         record = self.ws / "terms-acceptance.json"
-        for bad in ("{", json.dumps({"terms_version": "2"})):
+        for bad in ("{", json.dumps({"terms_version": "3"})):
             with self.subTest(record=bad):
                 record.write_text(bad)
                 self.assert_install_refused(block)
         terms.accept(self.rel, record, "Да, без рутин", "ru")
         tos = self.rel / "TERMS.md"
-        tos.write_text(tos.read_text(encoding="utf-8").replace("Version 2 ·", "Version 3 ·", 1), encoding="utf-8")
+        tos.write_text(tos.read_text(encoding="utf-8").replace("Version 3 ·", "Version 4 ·", 1), encoding="utf-8")
         self.assert_install_refused(block)
 
     def test_install_block_builds_with_receipt(self):
@@ -392,7 +392,7 @@ class TestDocumentedBlocksStop(unittest.TestCase):
         """The prose gate skipped: swap alone still refuses, nothing changes."""
         self.update_fixture()
         before = tree(self.ws)
-        for record in (None, "{", json.dumps({"terms_version": "2"})):
+        for record in (None, "{", json.dumps({"terms_version": "3"})):
             with self.subTest(record=record):
                 if record is not None:
                     (self.ws / "terms-acceptance.json").write_text(record)
